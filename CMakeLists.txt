@@ -14,6 +14,7 @@ find_package(glfw3 3.3 REQUIRED)
 
 add_executable(minecraftpp
 	src/main.cpp
+	src/shader.cpp
 
 	include/glad/src/glad.c
 )
