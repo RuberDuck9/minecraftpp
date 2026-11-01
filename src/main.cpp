@@ -81,7 +81,7 @@ int main(void) {
 	glEnableVertexAttribArray(0);
 
 	// create and enable the shader object
-	Shader customShader("shaders/vertex.glsl", "shaders/fragment.glsl");
+	Shader customShader("./shaders/vertex.glsl", "./shaders/fragment.glsl");
 	customShader.use();
 
 	while(!glfwWindowShouldClose(window)) {

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(
 	minecraftpp 
-	VERSION 0.1
+	VERSION 0.0.1
 	LANGUAGES C CXX 
 )
 
@@ -36,3 +36,5 @@ target_link_libraries(minecraftpp PRIVATE
 target_include_directories(minecraftpp PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/include/glad/include
 )
+
+install(TARGETS minecraftpp DESTINATION .)
