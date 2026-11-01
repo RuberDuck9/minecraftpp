@@ -1,1 +1,2 @@
-# minecraftpp
+# Minecraft++
+Incrediblely Optimized Minecraft Clone
