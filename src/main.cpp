@@ -81,8 +81,7 @@ int main(void) {
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 
   // tell opengl how to interpret the buffered data
-  glVertexAttribPointer(0, 3, GL_UNSIGNED_BYTE, GL_TRUE, 5 * sizeof(uint8_t),
-                        (void *)0);
+  glVertexAttribPointer(0, 3, GL_UNSIGNED_BYTE, GL_TRUE, 5 * sizeof(uint8_t), (void *)0);
 
   // enable the configuered vertex attrib array (in this case 0 for pos)
   glEnableVertexAttribArray(0);
@@ -104,16 +103,18 @@ int main(void) {
     glBindTexture(GL_TEXTURE_2D, texture);
 
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-    glGenerateMipmap(GL_TEXTURE_2D);
+    //glGenerateMipmap(GL_TEXTURE_2D);
     stbi_image_free(data);
   } else {
     std::cerr << "ERROR:TEXTURE:FAILED_TO_GENERATE_TEXTURE" << std::endl;
   }
 
   // tell opengl how to interpret the texture data
-  glVertexAttribPointer(1, 2, GL_UNSIGNED_BYTE, GL_TRUE, 5 * sizeof(uint8_t), (void *)(3 * sizeof(uint8_t)));
+  glVertexAttribPointer(1, 2, GL_UNSIGNED_BYTE, GL_FALSE, 5 * sizeof(uint8_t), (void *)(3 * sizeof(uint8_t)));
   glEnableVertexAttribArray(1);
 
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
  
@@ -121,7 +122,7 @@ int main(void) {
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, texture);
 
-  chunk please({0, 0}, customShader);
+  chunk please({0, 0, 0}, customShader, 16);
     
   please.generateChunkMesh();
 
@@ -140,7 +141,7 @@ int main(void) {
     glm::mat4 view = camera.getViewMatrix();
     customShader.setMat4("view", view);
 
-    glm::mat4 projection = glm::perspective(glm::radians(camera.fov), (float)windowWidth / windowHeight, 0.1f, 100.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(camera.fov), (float)windowWidth / windowHeight, 0.1f, 1024.0f);
     customShader.setMat4("projection", projection);
 
     please.renderChunkMesh();
