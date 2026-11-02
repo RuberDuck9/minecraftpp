@@ -32,6 +32,7 @@
               libGL
               glfw
               glm
+              stb
             ];
         };
       });

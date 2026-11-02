@@ -16,6 +16,8 @@ find_package(glfw3 3.3 REQUIRED)
 add_executable(minecraftpp
 	src/main.cpp
 	src/shader.cpp
+	src/camera.cpp
+	src/chunk.h
 
 	include/glad/src/glad.c
 )
@@ -31,6 +33,7 @@ target_compile_options(minecraftpp PRIVATE
 target_link_libraries(minecraftpp PRIVATE
 	OpenGL::OpenGL
 	glfw
+	glm
 )
 
 target_include_directories(minecraftpp PRIVATE
