@@ -34,7 +34,7 @@ public:
 
   // loop through the unordered map and render it all
   void renderWorld(void) {
-    for (std::unordered_map<ChunkPos, Chunk>::iterator it = loadedChunks.begin(); it != loadedChunks.end(); it++) { 
+    for (std::unordered_map<ChunkPos, Chunk>::const_iterator it = loadedChunks.begin(); it != loadedChunks.end(); it++) { 
       // get the second element of the unordered map (so the chunk itself, not the hash)
       it->second.renderChunkMesh();
     }
