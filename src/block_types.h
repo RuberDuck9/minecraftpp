@@ -10,6 +10,13 @@ struct blockType {
   uint8_t bu, bv;
 };
 
+const blockType air = { 
+  0, 
+  0, 160, 
+  0, 160, 
+  0, 160
+};
+
 const blockType grass = { 
   1, 
   0, 0, 
@@ -18,43 +25,31 @@ const blockType grass = {
 };
 
 const blockType stone = { 
-  1, 
+  3, 
   16, 0, 
   16, 0, 
   16, 0
 };
 
-/*
-const blockType grass = { 
+const blockType dirt = { 
   1, 
-  0, 0, 
-  48, 0, 
-  32, 0
-};
-const blockType grass = { 
-  1, 
-  0, 0, 
-  48, 0, 
-  32, 0
-};
-const blockType grass = { 
-  1, 
-  0, 0, 
-  48, 0, 
-  32, 0
-};
-const blockType grass = { 
-  1, 
-  0, 0, 
-  48, 0, 
-  32, 0
-};
-const blockType grass = { 
-  1, 
-  0, 0, 
-  48, 0, 
+  32, 0, 
+  32, 0, 
   32, 0
 };
 
-*/
+const blockType wood = { 
+  1, 
+  64, 0, 
+  64, 0, 
+  64, 0
+};
+
+const blockType bedrock = { 
+  1, 
+  16, 16, 
+  16, 16, 
+  16, 16
+};
+
 #endif

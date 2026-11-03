@@ -69,23 +69,6 @@ int main(void) {
   // make sure things render front to back
   glEnable(GL_DEPTH_TEST);
 
-  // generate each buffer object
-  unsigned int VAO, VBO, EBO;
-  glGenVertexArrays(1, &VAO);
-  glGenBuffers(1, &VBO);
-  glGenBuffers(1, &EBO);
-
-  // bind each buffer object
-  glBindVertexArray(VAO);
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-
-  // tell opengl how to interpret the buffered data
-  glVertexAttribPointer(0, 3, GL_UNSIGNED_BYTE, GL_TRUE, 5 * sizeof(uint8_t), (void *)0);
-
-  // enable the configuered vertex attrib array (in this case 0 for pos)
-  glEnableVertexAttribArray(0);
-
   // create and enable the shader 
   Shader customShader("./shaders/vertex.glsl", "./shaders/fragment.glsl");
   customShader.use();
@@ -109,10 +92,6 @@ int main(void) {
     std::cerr << "ERROR:TEXTURE:FAILED_TO_GENERATE_TEXTURE" << std::endl;
   }
 
-  // tell opengl how to interpret the texture data
-  glVertexAttribPointer(1, 2, GL_UNSIGNED_BYTE, GL_FALSE, 5 * sizeof(uint8_t), (void *)(3 * sizeof(uint8_t)));
-  glEnableVertexAttribArray(1);
-
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -122,9 +101,25 @@ int main(void) {
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, texture);
 
-  chunk please({0, 0, 0}, customShader, 16);
+  Chunk please1({0, 0, 0}, customShader);
+  Chunk please2({0, 1, 0}, customShader);
+  Chunk please3({0, 2, 0}, customShader);
+
+  please1.initializeChunk();
+  please2.initializeChunk();
+  please3.initializeChunk();
     
-  please.generateChunkMesh();
+  please1.generateChunkState();
+  please2.generateChunkState();
+  please3.generateChunkState();
+
+  please1.generateChunkMesh();
+  please2.generateChunkMesh();
+  please3.generateChunkMesh();
+
+  please1.bufferChunkData();
+  please2.bufferChunkData();
+  please3.bufferChunkData();
 
   while (!glfwWindowShouldClose(window)) {
     // poll for user input each frame
@@ -144,7 +139,9 @@ int main(void) {
     glm::mat4 projection = glm::perspective(glm::radians(camera.fov), (float)windowWidth / windowHeight, 0.1f, 1024.0f);
     customShader.setMat4("projection", projection);
 
-    please.renderChunkMesh();
+    please1.renderChunkMesh();
+    please2.renderChunkMesh();
+    please3.renderChunkMesh();
 
     glfwSwapBuffers(window);
     glfwPollEvents();

@@ -17,7 +17,7 @@ add_executable(minecraftpp
 	src/main.cpp
 	src/shader.cpp
 	src/camera.cpp
-	src/chunk.h
+	src/chunk.cpp
 
 	include/glad/src/glad.c
 )
@@ -26,7 +26,7 @@ target_compile_options(minecraftpp PRIVATE
 	-Wall
 	-Wextra
 	-Werror
-	-O3
+	-O1
 	-g
 )
 
