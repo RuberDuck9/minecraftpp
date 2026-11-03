@@ -1,18 +1,14 @@
-// OpenGL related includes
+#include <glm/ext/matrix_clip_space.hpp>
+#include <iostream>
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-
-// stb
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 
-// custom class includes
 #include "camera.h"
 #include "shader.h"
 #include "chunk.h"
-
-// cpp related includes
-#include <glm/ext/matrix_clip_space.hpp>
 
 // global variables
 const unsigned short windowWidth = 1920;
@@ -180,7 +176,6 @@ void processInput(GLFWwindow *window) {
 
   if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
     camera.processKeyboard(DOWN, deltaTime);
-
 
   if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
     camera.movementSpeed = SPEED * 5;

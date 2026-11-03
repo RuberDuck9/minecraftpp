@@ -1,7 +1,6 @@
 #include "chunk.h"
 
-// TODO: update the comments here
-
+// initialize the various array and buffer objects needed to render the chunk
 void Chunk::initializeChunk(void) {
   // generate the gpu objects for storing the chunk's data
   glGenVertexArrays(1, &VAO);
@@ -11,7 +10,7 @@ void Chunk::initializeChunk(void) {
   // bind the vertex array object 
   glBindVertexArray(VAO);
 
-  // bind each buffer object so buffer calls target them
+  // bind each buffer object so config calls target them
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 
@@ -23,10 +22,13 @@ void Chunk::initializeChunk(void) {
   glVertexAttribPointer(1, 2, GL_UNSIGNED_BYTE, GL_FALSE, 5 * sizeof(uint8_t), (void *)(3 * sizeof(uint8_t)));
   glEnableVertexAttribArray(1);
 
-  // unbind the vertex array objects (and subsequently the other buffer objects)
+  // unbind the vertex array object
   glBindVertexArray(0);
+
+  return;
 }
 
+// assign a block ID to each position within the chunk
 void Chunk::generateChunkState(void) {
 
   for (uint8_t x = 0; x < chunkSize; x++) {
@@ -52,6 +54,7 @@ void Chunk::generateChunkState(void) {
   return;
 }
 
+// generate the actual chunk mesh
 void Chunk::generateChunkMesh(void) {
 
   for (uint8_t x = 0; x < chunkSize; x++) {
@@ -59,12 +62,12 @@ void Chunk::generateChunkMesh(void) {
        for (uint8_t z = 0; z < chunkSize; z++) {
 
         if (chunkState[x][y][z].blockID != 0) {
-          generateFace({x, y, z}, 0, chunkState[x][y][z]);
-          generateFace({x, y, z}, 1, chunkState[x][y][z]);
-          generateFace({x, y, z}, 2, chunkState[x][y][z]);
-          generateFace({x, y, z}, 3, chunkState[x][y][z]);
-          generateFace({x, y, z}, 4, chunkState[x][y][z]);
-          generateFace({x, y, z}, 5, chunkState[x][y][z]);
+          generateFace({x, y, z}, NORTH, chunkState[x][y][z]);
+          generateFace({x, y, z}, SOUTH, chunkState[x][y][z]);
+          generateFace({x, y, z}, EAST, chunkState[x][y][z]);
+          generateFace({x, y, z}, WEST, chunkState[x][y][z]);
+          generateFace({x, y, z}, TOP, chunkState[x][y][z]);
+          generateFace({x, y, z}, BOTTOM, chunkState[x][y][z]);
         }
 
       }
@@ -74,6 +77,7 @@ void Chunk::generateChunkMesh(void) {
   return;
 }
 
+// send the chunk mesh to the gpu
 void Chunk::bufferChunkData(void) const {
   // bind the vertex array object 
   glBindVertexArray(VAO);
@@ -86,17 +90,16 @@ void Chunk::bufferChunkData(void) const {
   glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
 
+  // unbind the vertex objects
   glBindVertexArray(0);
 }
 
+// render the loaded chunk gpu data
 void Chunk::renderChunkMesh(void) const {
   // bind the vertex array object 
   glBindVertexArray(VAO);
 
-
-  // define the model matrix to scale up the chunk and normalize it"s coordinates
-  glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(chunkPos.x * chunkSize, chunkPos.y * chunkSize, chunkPos.z * chunkSize));
-  model = glm::scale(model, glm::vec3(255.0f, 255.0f, 255.0f));
+  // load the model matrix onto the gpu
   customShader.setMat4("model", model);
 
   glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
@@ -107,6 +110,7 @@ void Chunk::renderChunkMesh(void) const {
   return;
 }
 
+// function to return the texture atlas coordinates for each block face
 UV Chunk::getUV(const uint8_t &face, const blockType &block) const {
   if (face < 4) {
     return {block.su, block.sv};   
@@ -117,13 +121,14 @@ UV Chunk::getUV(const uint8_t &face, const blockType &block) const {
   }
 } 
 
+// generate an individual chunk face and add it's data to the vertex and index vectors
 void Chunk::generateFace(const FacePos &facePos, const uint8_t &face, const blockType &block) {
   unsigned int index = vertices.size();
 
   UV uv = getUV(face, block);
 
-  // Textures coordinates are assigned 'upside down' here depending on how you look at it
-  // This is done intentionally because the texture atlas itself is loaded upside down to ensure that 0 0 refers to the top left
+  // textures coordinates are assigned upside down here depending on how you look at it
+  // this is done intentionally because the texture atlas itself is loaded upside down to ensure that 0 0 refers to the top left
   vertices.push_back({static_cast<uint8_t>(faceCorners[face][0].x + facePos.x), 
                       static_cast<uint8_t>(faceCorners[face][0].y + facePos.y), 
                       static_cast<uint8_t>(faceCorners[face][0].z + facePos.z), 
