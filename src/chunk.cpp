@@ -160,3 +160,7 @@ void Chunk::generateFace(const FacePos &facePos, const uint8_t &face, const bloc
 
   return;
 }
+
+ChunkPos Chunk::getChunkPos(void) const {
+  return this->chunkPos;
+}

@@ -10,12 +10,18 @@
 #include "block_types.h"
 
 // define chunk dimensions
-const uint8_t chunkSize = 16;
+const inline uint8_t chunkSize = 16;
 
 enum Direction { NORTH, SOUTH, EAST, WEST, TOP, BOTTOM };
 
 struct ChunkPos {
   int64_t x, y, z;
+
+  bool operator==(const ChunkPos& otherPos) const {
+    return (x == otherPos.x 
+         && y == otherPos.y 
+         && z == otherPos.z);
+  }
 };
 
 struct FacePos {
@@ -32,13 +38,13 @@ struct UV {
 };
 
 // array to assist with sorting out each individual vertex for each voxel face
-inline FacePos faceCorners[6][4] = {
-    {{0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1}}, // North
-    {{1, 0, 0}, {0, 0, 0}, {0, 1, 0}, {1, 1, 0}}, // South
-    {{1, 0, 1}, {1, 0, 0}, {1, 1, 0}, {1, 1, 1}}, // East
-    {{0, 0, 0}, {0, 0, 1}, {0, 1, 1}, {0, 1, 0}}, // West
-    {{0, 1, 1}, {1, 1, 1}, {1, 1, 0}, {0, 1, 0}}, // Top
-    {{0, 0, 0}, {1, 0, 0}, {1, 0, 1}, {0, 0, 1}}, // Bottom
+const inline FacePos faceCorners[6][4] = {
+    {{0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1}}, // north
+    {{1, 0, 0}, {0, 0, 0}, {0, 1, 0}, {1, 1, 0}}, // south
+    {{1, 0, 1}, {1, 0, 0}, {1, 1, 0}, {1, 1, 1}}, // east
+    {{0, 0, 0}, {0, 0, 1}, {0, 1, 1}, {0, 1, 0}}, // west
+    {{0, 1, 1}, {1, 1, 1}, {1, 1, 0}, {0, 1, 0}}, // top
+    {{0, 0, 0}, {1, 0, 0}, {1, 0, 1}, {0, 0, 1}}, // bottom
 };
 
 class Chunk {
@@ -65,6 +71,9 @@ public:
   // render the loaded chunk gpu data
   void renderChunkMesh(void) const;
 
+  // function to return the position of the chunk
+  ChunkPos getChunkPos(void) const;
+
 private:
   // store the chunk coordinate (in increments of 16 compared to world
   // coordinates)
@@ -77,8 +86,7 @@ private:
   std::vector<Vertex> vertices;
   std::vector<unsigned int> indices;
 
-  // store a reference the shader in use (for uploading the model matrix to
-  // normalize coordinates during rendering)
+  // store a reference the shader in use (for uploading the model matrix to normalize coordinates during rendering)
   const Shader &customShader;
 
   // model matrix to store the chunk's position normalization

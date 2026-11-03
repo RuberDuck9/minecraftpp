@@ -18,6 +18,7 @@ add_executable(minecraftpp
 	src/shader.cpp
 	src/camera.cpp
 	src/chunk.cpp
+	src/world.hpp
 
 	include/glad/src/glad.c
 )

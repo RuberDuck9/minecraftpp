@@ -8,7 +8,7 @@
 
 #include "camera.h"
 #include "shader.h"
-#include "chunk.h"
+#include "world.hpp"
 
 // global variables
 const unsigned short windowWidth = 1920;
@@ -17,7 +17,7 @@ const unsigned short windowHeight = 1080;
 float deltaTime = 0.0f;
 float lastTime = 0.0f;
 
-Camera camera(glm::vec3(0.0f, 0.0f, 0.0f));
+Camera camera(glm::vec3(0.0f, 47.0f, 10.0f));
 float lastX = windowHeight / 2.0f;
 float lastY = windowWidth / 2.0f;
 bool mouseInitialized = false;
@@ -97,25 +97,10 @@ int main(void) {
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, texture);
 
-  Chunk please1({0, 0, 0}, customShader);
-  Chunk please2({0, 1, 0}, customShader);
-  Chunk please3({0, 2, 0}, customShader);
-
-  please1.initializeChunk();
-  please2.initializeChunk();
-  please3.initializeChunk();
-    
-  please1.generateChunkState();
-  please2.generateChunkState();
-  please3.generateChunkState();
-
-  please1.generateChunkMesh();
-  please2.generateChunkMesh();
-  please3.generateChunkMesh();
-
-  please1.bufferChunkData();
-  please2.bufferChunkData();
-  please3.bufferChunkData();
+  World world(customShader);
+  world.generateChunk({0, 0, 0}); 
+  world.generateChunk({0, 1, 0}); 
+  world.generateChunk({0, 2, 0}); 
 
   while (!glfwWindowShouldClose(window)) {
     // poll for user input each frame
@@ -135,9 +120,7 @@ int main(void) {
     glm::mat4 projection = glm::perspective(glm::radians(camera.fov), (float)windowWidth / windowHeight, 0.1f, 1024.0f);
     customShader.setMat4("projection", projection);
 
-    please1.renderChunkMesh();
-    please2.renderChunkMesh();
-    please3.renderChunkMesh();
+    world.renderWorld();
 
     glfwSwapBuffers(window);
     glfwPollEvents();
