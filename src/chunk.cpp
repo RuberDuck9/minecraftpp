@@ -1,7 +1,21 @@
 #include "chunk.h"
+#include "shader.h"
+
+#include <iostream>
 
 // initialize the various array and buffer objects needed to render the chunk
 void Chunk::initializeChunk(void) {
+
+  // get the currently loaded VAO
+  GLuint boundVAO;
+  glGetIntegerv(GL_VERTEX_ARRAY_BINDING, (GLint*)&boundVAO);
+
+  // wait until the currently loaded VAO is 0, indicating that the resouce is now free to use
+  while (boundVAO != 0) {
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, (GLint*)&boundVAO);
+    std::cout << "waiting for free 1";
+  }
+
   // generate the gpu objects for storing the chunk's data
   glGenVertexArrays(1, &VAO);
   glGenBuffers(1, &VBO);
@@ -81,7 +95,18 @@ void Chunk::generateChunkMesh(void) {
 }
 
 // send the chunk mesh to the gpu
-void Chunk::bufferChunkData(void) const {
+void Chunk::bufferChunkData(void) {
+
+  // get the currently loaded VAO
+  GLuint boundVAO;
+  glGetIntegerv(GL_VERTEX_ARRAY_BINDING, (GLint*)&boundVAO);
+
+  // wait until the currently loaded VAO is 0, indicating that the resouce is now free to use
+  while (boundVAO != 0) {
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, (GLint*)&boundVAO);
+    std::cout << "waiting for free 2";
+  }
+
   // bind the vertex array object 
   glBindVertexArray(VAO);
 
@@ -96,11 +121,24 @@ void Chunk::bufferChunkData(void) const {
   // unbind the vertex objects
   glBindVertexArray(0);
 
+  chunkLoaded = true;
+
   return;
 }
 
 // render the loaded chunk gpu data
 void Chunk::renderChunkMesh(void) const {
+
+  // get the currently loaded VAO
+  GLuint boundVAO;
+  glGetIntegerv(GL_VERTEX_ARRAY_BINDING, (GLint*)&boundVAO);
+
+  // wait until the currently loaded VAO is 0, indicating that the resouce is now free to use
+  while (boundVAO != 0) {
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, (GLint*)&boundVAO);
+    std::cout << "waiting for free 3";
+  }
+
   // bind the vertex array object 
   glBindVertexArray(VAO);
 
@@ -193,4 +231,8 @@ void Chunk::setNeighbor(Chunk* chunk, Direction direction) {
   
   neighbors[direction] = chunk;
   return;
+}
+
+bool Chunk::chunkIsLoaded(void) const {
+  return this->chunkLoaded;
 }

@@ -1,6 +1,8 @@
 // TODO: implement neighbor checks and only render exposed blocks
 // TODO: move chunk update checks to a separate thread
+// TODO: fix race condition where both render and generate functions overlap their buffer calls when on separate threads
 
+#include <atomic>
 #include <functional>
 #include <unordered_map>
 #include <queue>
@@ -35,48 +37,50 @@ public:
   // queue all chunks within render distance of the player to be loaded if they are not already
   void queueChunkLoading(void) {
 
-    // grab the current player/camera position
-    float camX = camera.cameraPos.x;
-    float camY = camera.cameraPos.y;
-    float camZ = camera.cameraPos.z;
+    while (shouldGenerateWorld) {
+      // grab the current player/camera position
+      float camX = camera.cameraPos.x;
+      float camY = camera.cameraPos.y;
+      float camZ = camera.cameraPos.z;
 
-    // define a search radius around the current position
-    int radius = renderDistance * 16;
+      // define a search radius around the current position
+      int radius = renderDistance * 16;
 
-    // use integer truncation to store the relative chunk coordinate for the position being searched
-    int chunkX, chunkY, chunkZ;
+      // use integer truncation to store the relative chunk coordinate for the position being searched
+      int chunkX, chunkY, chunkZ;
 
-    // loop through a 3d sphere around the current position
-    for (float px = camX - radius; px <= camX + radius; px++) {
-      for (float py = camY - radius; py <= camY + radius; py++) {
-        for (float pz = camZ - radius; pz <= camZ + radius; pz++) {
+      // loop through a 3d sphere around the current position
+      for (float px = camX - radius; px <= camX + radius; px++) {
+        for (float py = camY - radius; py <= camY + radius; py++) {
+          for (float pz = camZ - radius; pz <= camZ + radius; pz++) {
 
-          // check if the position being checked is within the search radius
-          float dx = camX - px, dy = camY - py, dz = camZ - pz;
-          if (dx * dx + dy * dy + dz * dz <= radius * radius * radius) {
+            // check if the position being checked is within the search radius
+            float dx = camX - px, dy = camY - py, dz = camZ - pz;
+            if (dx * dx + dy * dy + dz * dz <= radius * radius * radius) {
 
-            // calculate normalized chunk coordinates and use them to generate a target chunk
-            chunkX = px / 16;
-            chunkY = py / 16;
-            chunkZ = pz / 16;
-            ChunkPos targetChunkPos = {chunkX, chunkY, chunkZ};
+              // calculate normalized chunk coordinates and use them to generate a target chunk
+              chunkX = px / 16;
+              chunkY = py / 16;
+              chunkZ = pz / 16;
+              ChunkPos targetChunkPos = {chunkX, chunkY, chunkZ};
 
-            // check if the target chunk exists yet
-            std::unordered_map<ChunkPos, Chunk>::iterator targetChunk = Chunks.find(targetChunkPos);
+              // check if the target chunk exists yet
+              std::unordered_map<ChunkPos, Chunk>::iterator targetChunk = Chunks.find(targetChunkPos);
 
-            // runs if the target chunk does not yet exist
-            if (targetChunk == Chunks.end()){
+              // runs if the target chunk does not yet exist
+              if (targetChunk == Chunks.end()){
 
-              // generate the target chunk and add it to the Chunks unordered_map
-              Chunks.emplace(targetChunkPos, Chunk(targetChunkPos, customShader));
+                // generate the target chunk and add it to the Chunks unordered_map
+                Chunks.emplace(targetChunkPos, Chunk(targetChunkPos, customShader));
 
-              // find where the new chunk was added to the map, and pass a pointer to that location to the load queue
-              std::unordered_map<ChunkPos, Chunk>::iterator freshChunk = Chunks.find(targetChunkPos);
-              loadQueue.push(&freshChunk->second);
+                // find where the new chunk was added to the map, and pass a pointer to that location to the load queue
+                std::unordered_map<ChunkPos, Chunk>::iterator freshChunk = Chunks.find(targetChunkPos);
+                loadQueue.push(&freshChunk->second);
 
-            // if the target chunk does exist, then update the neighbors array for the chunks around it
-            } else {
-              updateNeighbors(targetChunk->second);
+              // if the target chunk does exist, then update the neighbors array for the chunks around it
+              } else {
+                //updateNeighbors(targetChunk->second);
+              }
             }
           }
         }
@@ -87,8 +91,8 @@ public:
   }
 
   // take n elements out of the loadQueue, generate them, and buffer them to the gpu
-  void processLoadQueue(unsigned int count) {
-    for (unsigned int i = 0; i < count; i++) {
+  void processLoadQueue(void) {
+    while (shouldGenerateWorld) {
       if (!loadQueue.empty()) {
         generateChunk(*loadQueue.front());
         loadQueue.pop();
@@ -102,7 +106,7 @@ public:
   void renderWorld(void) {
     for (std::unordered_map<ChunkPos, Chunk>::const_iterator it = Chunks.begin(); it != Chunks.end(); it++) { 
       // make sure the chunk is initialized before trying to load it (this is important if it hasn't been processed through the queue yet)
-      if (it->second.chunkIsInitialized()) {
+      if (it->second.chunkIsLoaded()) {
         // get the second element of the unordered map (so the chunk itself, not the hash)
         it->second.renderChunkMesh();
       }
@@ -166,11 +170,17 @@ public:
     return;
   }
 
+  void closeWorld(void) {
+    shouldGenerateWorld = false;
+  }
+
 private:
   const Shader &customShader;
   const Camera &camera;
 
   const int renderDistance = 4;
+
+  std::atomic<bool> shouldGenerateWorld = true;
 
   std::unordered_map<ChunkPos, Chunk> Chunks; 
   std::queue<Chunk*> loadQueue;

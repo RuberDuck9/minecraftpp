@@ -1,5 +1,6 @@
 #include <glm/ext/matrix_clip_space.hpp>
 #include <iostream>
+#include <thread>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -99,6 +100,9 @@ int main(void) {
 
   World world(customShader, camera);
 
+  std::thread loadThread(&World::queueChunkLoading, &world);
+  std::thread queueThread(&World::processLoadQueue, &world);
+
   while (!glfwWindowShouldClose(window)) {
     // poll for user input each frame
     processInput(window);
@@ -117,13 +121,17 @@ int main(void) {
     glm::mat4 projection = glm::perspective(glm::radians(camera.fov), (float)windowWidth / windowHeight, 0.1f, 1024.0f);
     customShader.setMat4("projection", projection);
 
-    world.queueChunkLoading();
-    world.processLoadQueue(10);
+    //world.processLoadQueue();
     world.renderWorld();
 
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
+
+  world.closeWorld();
+
+  loadThread.join();
+  queueThread.join();
 
   // cleanup
   glfwTerminate();

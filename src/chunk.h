@@ -63,6 +63,7 @@ public:
     model = glm::scale(model, glm::vec3(255.0f, 255.0f, 255.0f));
     chunkInitialized = false;
     chunkGenerated = false;
+    chunkLoaded = false;
     for (uint8_t x = 0; x < chunkSize; x++) {
       for (uint8_t y = 0; y < chunkSize; y++) {
          for (uint8_t z = 0; z < chunkSize; z++) {
@@ -75,6 +76,7 @@ public:
     VAO = 0;
     VBO = 0;
     EBO = 0;
+    glBindVertexArray(0);
   }
 
   // initialize the various array and buffer objects needed to render the chunk
@@ -87,7 +89,7 @@ public:
   void generateChunkMesh(void);
 
   // send the chunk mesh to the gpu
-  void bufferChunkData(void) const;
+  void bufferChunkData(void);
 
   // render the loaded chunk gpu data
   void renderChunkMesh(void) const;
@@ -100,6 +102,9 @@ public:
 
   // return if the chunk is generated
   bool chunkIsGenerated() const;
+  
+  // return if the chunk is buffered to the gpu
+  bool chunkIsLoaded() const;
 
   // function to return the position of the chunk
   ChunkPos getChunkPos(void) const;
@@ -126,10 +131,10 @@ private:
   glm::mat4 model;
 
   // vertex objects to store the chunk data on the gpu
-  unsigned int VAO, VBO, EBO;
+  GLuint VAO, VBO, EBO;
 
   // variables to store whether or not the chunk is loaded and generated
-  bool chunkInitialized, chunkGenerated;
+  bool chunkInitialized, chunkGenerated, chunkLoaded;
 
   // array to store pointers to all the neighboring chunks
   Chunk* neighbors[6];
