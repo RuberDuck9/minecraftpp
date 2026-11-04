@@ -54,6 +54,20 @@ public:
   Chunk(const ChunkPos chunkPos, const Shader &customShader) : chunkPos(chunkPos), customShader(customShader) {
     model = glm::translate(glm::mat4(1.0f), glm::vec3(chunkPos.x * chunkSize, chunkPos.y * chunkSize, chunkPos.z * chunkSize));
     model = glm::scale(model, glm::vec3(255.0f, 255.0f, 255.0f));
+    chunkInitialized = false;
+    chunkGenerated = false;
+    for (uint8_t x = 0; x < chunkSize; x++) {
+      for (uint8_t y = 0; y < chunkSize; y++) {
+         for (uint8_t z = 0; z < chunkSize; z++) {
+
+          chunkState[x][y][z] = air;
+
+        }
+      }
+    }
+    VAO = 0;
+    VBO = 0;
+    EBO = 0;
   }
 
   // initialize the various array and buffer objects needed to render the chunk
@@ -70,6 +84,13 @@ public:
 
   // render the loaded chunk gpu data
   void renderChunkMesh(void) const;
+
+  // unload the chunk data from the gpu
+  void unloadChunk(void);
+
+  bool chunkIsInitialized() const;
+
+  bool chunkIsGenerated() const;
 
   // function to return the position of the chunk
   ChunkPos getChunkPos(void) const;
@@ -94,6 +115,9 @@ private:
 
   // vertex objects to store the chunk data on the gpu
   unsigned int VAO, VBO, EBO;
+
+  // variables to store whether or not the chunk is loaded and generated
+  bool chunkInitialized, chunkGenerated;
 
   // function to return the texture atlas coordinates for each block face
   UV getUV(const uint8_t &face, const blockType &block) const;

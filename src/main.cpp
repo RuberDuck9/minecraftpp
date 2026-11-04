@@ -97,10 +97,7 @@ int main(void) {
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, texture);
 
-  World world(customShader);
-  world.generateChunk({0, 0, 0}); 
-  world.generateChunk({0, 1, 0}); 
-  world.generateChunk({0, 2, 0}); 
+  World world(customShader, camera);
 
   while (!glfwWindowShouldClose(window)) {
     // poll for user input each frame
@@ -120,6 +117,8 @@ int main(void) {
     glm::mat4 projection = glm::perspective(glm::radians(camera.fov), (float)windowWidth / windowHeight, 0.1f, 1024.0f);
     customShader.setMat4("projection", projection);
 
+    world.queueChunkLoading();
+    world.processLoadQueue(10);
     world.renderWorld();
 
     glfwSwapBuffers(window);

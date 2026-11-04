@@ -25,6 +25,8 @@ void Chunk::initializeChunk(void) {
   // unbind the vertex array object
   glBindVertexArray(0);
 
+  chunkInitialized = true;
+
   return;
 }
 
@@ -51,6 +53,7 @@ void Chunk::generateChunkState(void) {
     }
   }
 
+  chunkGenerated = true;
   return;
 }
 
@@ -92,6 +95,8 @@ void Chunk::bufferChunkData(void) const {
 
   // unbind the vertex objects
   glBindVertexArray(0);
+
+  return;
 }
 
 // render the loaded chunk gpu data
@@ -108,6 +113,16 @@ void Chunk::renderChunkMesh(void) const {
   glBindVertexArray(0);
 
   return;
+}
+
+void Chunk::unloadChunk(void) {
+
+  glDeleteBuffers(1, &VAO);
+  glDeleteBuffers(1, &VBO);
+  glDeleteBuffers(1, &EBO);
+
+  chunkInitialized = false;
+
 }
 
 // function to return the texture atlas coordinates for each block face
@@ -163,4 +178,12 @@ void Chunk::generateFace(const FacePos &facePos, const uint8_t &face, const bloc
 
 ChunkPos Chunk::getChunkPos(void) const {
   return this->chunkPos;
+}
+
+bool Chunk::chunkIsGenerated(void) const {
+  return this->chunkGenerated;
+}
+
+bool Chunk::chunkIsInitialized(void) const {
+  return this->chunkInitialized;
 }
