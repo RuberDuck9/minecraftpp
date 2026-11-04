@@ -1,4 +1,5 @@
 // TODO: implement neighbor checks and only render exposed blocks
+// TODO: move chunk update checks to a separate thread
 
 #include <functional>
 #include <unordered_map>
@@ -61,7 +62,7 @@ public:
             ChunkPos targetChunkPos = {chunkX, chunkY, chunkZ};
 
             // check if the target chunk exists yet
-            std::unordered_map<ChunkPos, Chunk>::const_iterator targetChunk = Chunks.find(targetChunkPos);
+            std::unordered_map<ChunkPos, Chunk>::iterator targetChunk = Chunks.find(targetChunkPos);
 
             // runs if the target chunk does not yet exist
             if (targetChunk == Chunks.end()){
@@ -72,6 +73,10 @@ public:
               // find where the new chunk was added to the map, and pass a pointer to that location to the load queue
               std::unordered_map<ChunkPos, Chunk>::iterator freshChunk = Chunks.find(targetChunkPos);
               loadQueue.push(&freshChunk->second);
+
+            // if the target chunk does exist, then update the neighbors array for the chunks around it
+            } else {
+              updateNeighbors(targetChunk->second);
             }
           }
         }
@@ -106,6 +111,60 @@ public:
     return;
   }
 
+  // return a neighboring chunk in a specified direction if it exists
+  Chunk* getNeighbor(const Chunk& chunk, Direction direction) {
+    ChunkPos currentChunkPos = chunk.getChunkPos();
+    ChunkPos targetChunkPos;
+
+    // generate a position for where to search based on the current chunk position and the search direction
+    switch (direction) {
+      case NORTH:
+        targetChunkPos = {currentChunkPos.x, currentChunkPos.y, currentChunkPos.z + 1};
+        break;
+      case SOUTH:
+        targetChunkPos = {currentChunkPos.x, currentChunkPos.y, currentChunkPos.z - 1};
+        break;
+      case EAST:
+        targetChunkPos = {currentChunkPos.x + 1, currentChunkPos.y, currentChunkPos.z};
+        break;
+      case WEST:
+        targetChunkPos = {currentChunkPos.x - 1, currentChunkPos.y, currentChunkPos.z};
+        break;
+      case ABOVE:
+        targetChunkPos = {currentChunkPos.x, currentChunkPos.y + 1, currentChunkPos.z};
+        break;
+      case BELOW:
+        targetChunkPos = {currentChunkPos.x, currentChunkPos.y - 1, currentChunkPos.z};
+        break;
+      // if an invald enum is passed, return a nullptr since this is indefined behavior (and should never happen)
+      default:
+        return nullptr;
+    }
+
+    // check if the target chunk exists within the chunk map
+    std::unordered_map<ChunkPos, Chunk>::iterator targetChunk = Chunks.find(targetChunkPos);
+
+    // if it does, return a pointer to it
+    if (targetChunk != Chunks.end()){
+      return &targetChunk->second;
+    // if it is not found, return a nullptr
+    } else {
+      return nullptr;
+    }
+
+  }
+
+  // update the neighrs array for a chunk with all of its neighboring chunks
+  void updateNeighbors(Chunk& chunk) {
+    chunk.setNeighbor( getNeighbor(chunk, NORTH), NORTH ); 
+    chunk.setNeighbor( getNeighbor(chunk, SOUTH), NORTH ); 
+    chunk.setNeighbor( getNeighbor(chunk,  EAST),  WEST ); 
+    chunk.setNeighbor( getNeighbor(chunk,  WEST),  EAST ); 
+    chunk.setNeighbor( getNeighbor(chunk, ABOVE), ABOVE ); 
+    chunk.setNeighbor( getNeighbor(chunk, BELOW), BELOW ); 
+
+    return;
+  }
 
 private:
   const Shader &customShader;

@@ -12,7 +12,14 @@
 // define chunk dimensions
 const inline uint8_t chunkSize = 16;
 
-enum Direction { NORTH, SOUTH, EAST, WEST, TOP, BOTTOM };
+enum Direction { 
+  NORTH = 0, 
+  SOUTH = 1, 
+  EAST = 2, 
+  WEST = 3, 
+  TOP, ABOVE = 4, 
+  BOTTOM, BELOW = 5
+};
 
 struct ChunkPos {
   int64_t x, y, z;
@@ -88,12 +95,17 @@ public:
   // unload the chunk data from the gpu
   void unloadChunk(void);
 
+  // return if the chunk is initialized
   bool chunkIsInitialized() const;
 
+  // return if the chunk is generated
   bool chunkIsGenerated() const;
 
   // function to return the position of the chunk
   ChunkPos getChunkPos(void) const;
+
+  // update the neighbors array
+  void setNeighbor(Chunk* neighbor, Direction direction);
 
 private:
   // store the chunk coordinate (in increments of 16 compared to world
@@ -118,6 +130,9 @@ private:
 
   // variables to store whether or not the chunk is loaded and generated
   bool chunkInitialized, chunkGenerated;
+
+  // array to store pointers to all the neighboring chunks
+  Chunk* neighbors[6];
 
   // function to return the texture atlas coordinates for each block face
   UV getUV(const uint8_t &face, const blockType &block) const;

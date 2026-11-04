@@ -122,7 +122,8 @@ void Chunk::unloadChunk(void) {
   glDeleteBuffers(1, &EBO);
 
   chunkInitialized = false;
-
+  
+  return;
 }
 
 // function to return the texture atlas coordinates for each block face
@@ -186,4 +187,10 @@ bool Chunk::chunkIsGenerated(void) const {
 
 bool Chunk::chunkIsInitialized(void) const {
   return this->chunkInitialized;
+}
+
+void Chunk::setNeighbor(Chunk* chunk, Direction direction) {
+  
+  neighbors[direction] = chunk;
+  return;
 }
