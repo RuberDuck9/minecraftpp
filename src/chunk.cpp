@@ -1,49 +1,6 @@
 #include "chunk.h"
 #include "shader.h"
 
-#include <iostream>
-
-// initialize the various array and buffer objects needed to render the chunk
-void Chunk::initializeChunk(void) {
-
-  // get the currently loaded VAO
-  GLuint boundVAO;
-  glGetIntegerv(GL_VERTEX_ARRAY_BINDING, (GLint*)&boundVAO);
-
-  // wait until the currently loaded VAO is 0, indicating that the resouce is now free to use
-  while (boundVAO != 0) {
-    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, (GLint*)&boundVAO);
-    std::cout << "waiting for free 1";
-  }
-
-  // generate the gpu objects for storing the chunk's data
-  glGenVertexArrays(1, &VAO);
-  glGenBuffers(1, &VBO);
-  glGenBuffers(1, &EBO);
-
-  // bind the vertex array object 
-  glBindVertexArray(VAO);
-
-  // bind each buffer object so config calls target them
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-
-  // tell opengl how to interpret the buffered vertex data
-  glVertexAttribPointer(0, 3, GL_UNSIGNED_BYTE, GL_TRUE, 5 * sizeof(uint8_t), (void *)0);
-  glEnableVertexAttribArray(0);
-
-  // tell opengl how to interpret the texture data
-  glVertexAttribPointer(1, 2, GL_UNSIGNED_BYTE, GL_FALSE, 5 * sizeof(uint8_t), (void *)(3 * sizeof(uint8_t)));
-  glEnableVertexAttribArray(1);
-
-  // unbind the vertex array object
-  glBindVertexArray(0);
-
-  chunkInitialized = true;
-
-  return;
-}
-
 // assign a block ID to each position within the chunk
 void Chunk::generateChunkState(void) {
 
@@ -57,8 +14,6 @@ void Chunk::generateChunkState(void) {
           chunkState[x][y][z] = grass;
         } else if (y + chunkPos.y * chunkSize > 40) {
           chunkState[x][y][z] = dirt;
-        } else if (y + chunkPos.y * chunkSize == 0) {
-          chunkState[x][y][z] = bedrock;
         } else {
           chunkState[x][y][z] = stone;
         }
@@ -73,6 +28,10 @@ void Chunk::generateChunkState(void) {
 
 // generate the actual chunk mesh
 void Chunk::generateChunkMesh(void) {
+
+  // remove any existing mesh data before generating new stuff
+  vertices.clear();
+  indices.clear();
 
   for (uint8_t x = 0; x < chunkSize; x++) {
     for (uint8_t y = 0; y < chunkSize; y++) {
@@ -97,14 +56,33 @@ void Chunk::generateChunkMesh(void) {
 // send the chunk mesh to the gpu
 void Chunk::bufferChunkData(void) {
 
-  // get the currently loaded VAO
-  GLuint boundVAO;
-  glGetIntegerv(GL_VERTEX_ARRAY_BINDING, (GLint*)&boundVAO);
+  if (!chunkInitialized) {
+    // generate the vertex array object
+    glGenVertexArrays(1, &VAO);
 
-  // wait until the currently loaded VAO is 0, indicating that the resouce is now free to use
-  while (boundVAO != 0) {
-    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, (GLint*)&boundVAO);
-    std::cout << "waiting for free 2";
+    // bind the vertex array object 
+    glBindVertexArray(VAO);
+
+    // generate the gpu objects for storing the chunk's data
+    glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
+
+    // bind each buffer objects so config calls target them
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+
+    // tell opengl how to interpret the buffered vertex data
+    glVertexAttribPointer(0, 3, GL_UNSIGNED_BYTE, GL_TRUE, 5 * sizeof(uint8_t), (void *)0);
+    glEnableVertexAttribArray(0);
+
+    // tell opengl how to interpret the texture data
+    glVertexAttribPointer(1, 2, GL_UNSIGNED_BYTE, GL_FALSE, 5 * sizeof(uint8_t), (void *)(3 * sizeof(uint8_t)));
+    glEnableVertexAttribArray(1);
+
+    // unbind the vertex array object
+    glBindVertexArray(0);
+
+    chunkInitialized = true;
   }
 
   // bind the vertex array object 
@@ -129,16 +107,6 @@ void Chunk::bufferChunkData(void) {
 // render the loaded chunk gpu data
 void Chunk::renderChunkMesh(void) const {
 
-  // get the currently loaded VAO
-  GLuint boundVAO;
-  glGetIntegerv(GL_VERTEX_ARRAY_BINDING, (GLint*)&boundVAO);
-
-  // wait until the currently loaded VAO is 0, indicating that the resouce is now free to use
-  while (boundVAO != 0) {
-    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, (GLint*)&boundVAO);
-    std::cout << "waiting for free 3";
-  }
-
   // bind the vertex array object 
   glBindVertexArray(VAO);
 
@@ -150,17 +118,6 @@ void Chunk::renderChunkMesh(void) const {
   // unbind the vertex array objects (and subsequently the other buffer objects)
   glBindVertexArray(0);
 
-  return;
-}
-
-void Chunk::unloadChunk(void) {
-
-  glDeleteBuffers(1, &VAO);
-  glDeleteBuffers(1, &VBO);
-  glDeleteBuffers(1, &EBO);
-
-  chunkInitialized = false;
-  
   return;
 }
 

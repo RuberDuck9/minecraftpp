@@ -79,9 +79,6 @@ public:
     glBindVertexArray(0);
   }
 
-  // initialize the various array and buffer objects needed to render the chunk
-  void initializeChunk(void);
-
   // assign a block ID to each position within the chunk
   void generateChunkState(void);
 
@@ -93,9 +90,6 @@ public:
 
   // render the loaded chunk gpu data
   void renderChunkMesh(void) const;
-
-  // unload the chunk data from the gpu
-  void unloadChunk(void);
 
   // return if the chunk is initialized
   bool chunkIsInitialized() const;

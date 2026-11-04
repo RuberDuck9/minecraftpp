@@ -1,6 +1,4 @@
 // TODO: implement neighbor checks and only render exposed blocks
-// TODO: move chunk update checks to a separate thread
-// TODO: fix race condition where both render and generate functions overlap their buffer calls when on separate threads
 
 #include <atomic>
 #include <functional>
@@ -26,17 +24,10 @@ class World {
 public:
   World(const Shader &customShader, const Camera &camera) : customShader(customShader), camera(camera) {}
 
-  // generate a new chunk and buffer its data to the gpu
-  void generateChunk(Chunk &newChunk) const {
-    newChunk.initializeChunk();
-    newChunk.generateChunkState();
-    newChunk.generateChunkMesh();
-    newChunk.bufferChunkData();
-  }
-
   // queue all chunks within render distance of the player to be loaded if they are not already
   void queueChunkLoading(void) {
 
+    // loop forever as long as the world needs to be generated
     while (shouldGenerateWorld) {
       // grab the current player/camera position
       float camX = camera.cameraPos.x;
@@ -75,11 +66,15 @@ public:
 
                 // find where the new chunk was added to the map, and pass a pointer to that location to the load queue
                 std::unordered_map<ChunkPos, Chunk>::iterator freshChunk = Chunks.find(targetChunkPos);
-                loadQueue.push(&freshChunk->second);
+                terrainGenerationQueue.push(&freshChunk->second);
 
-              // if the target chunk does exist, then update the neighbors array for the chunks around it
+              // if the target chunk does exist, then update the neighbors array for the chunks around it and regenerate its mesh
               } else {
-                //updateNeighbors(targetChunk->second);
+                updateNeighbors(targetChunk->second);
+
+                if (meshGenerationQueue.empty()) {
+                  meshGenerationQueue.push(&targetChunk->second);
+                }
               }
             }
           }
@@ -90,12 +85,38 @@ public:
     return;
   }
 
-  // take n elements out of the loadQueue, generate them, and buffer them to the gpu
-  void processLoadQueue(void) {
-    while (shouldGenerateWorld) {
-      if (!loadQueue.empty()) {
-        generateChunk(*loadQueue.front());
-        loadQueue.pop();
+  // take an element from the terrain generation queue, generate it, and then send it to the mesh generation queue
+  void processTerrainGenerationQueue(void) {
+    while(shouldGenerateWorld) {
+      if (!terrainGenerationQueue.empty()) {
+        terrainGenerationQueue.front()->generateChunkState();
+        meshGenerationQueue.push(terrainGenerationQueue.front());
+        terrainGenerationQueue.pop();
+      }
+    }
+
+    return;
+  }
+
+  // take an element from the mesh generation queue, generate it, and then send it to the gpu buffer queue
+  void processMeshGenerationQueue(void) {
+    while(shouldGenerateWorld) {
+      if (!meshGenerationQueue.empty()) {
+        meshGenerationQueue.front()->generateChunkMesh();
+        bufferQueue.push(meshGenerationQueue.front());
+        meshGenerationQueue.pop();
+      }
+    }
+
+    return;
+  }
+
+  // take an element from the buffer queue, and buffer its data to the gpu
+  void processBufferQueue(unsigned int count) {
+    for (unsigned i = 0; i < count; i++) {
+      if (!bufferQueue.empty()) {
+        bufferQueue.front()->bufferChunkData();
+        bufferQueue.pop();
       }
     }
 
@@ -183,5 +204,7 @@ private:
   std::atomic<bool> shouldGenerateWorld = true;
 
   std::unordered_map<ChunkPos, Chunk> Chunks; 
-  std::queue<Chunk*> loadQueue;
+  std::queue<Chunk*> terrainGenerationQueue;
+  std::queue<Chunk*> meshGenerationQueue;
+  std::queue<Chunk*> bufferQueue;
 };

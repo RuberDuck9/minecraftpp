@@ -98,10 +98,13 @@ int main(void) {
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, texture);
 
+  // make the world object itself
   World world(customShader, camera);
 
+  // spawn three threads to sift through render distance, generate chunk terrain, and generate chunk meshes in the background
   std::thread loadThread(&World::queueChunkLoading, &world);
-  std::thread queueThread(&World::processLoadQueue, &world);
+  std::thread terrainGenerationThread(&World::processTerrainGenerationQueue, &world);
+  std::thread meshGenerationThread(&World::processMeshGenerationQueue, &world);
 
   while (!glfwWindowShouldClose(window)) {
     // poll for user input each frame
@@ -121,17 +124,21 @@ int main(void) {
     glm::mat4 projection = glm::perspective(glm::radians(camera.fov), (float)windowWidth / windowHeight, 0.1f, 1024.0f);
     customShader.setMat4("projection", projection);
 
-    //world.processLoadQueue();
+    // buffer and render the world in the main thread (important!)
+    world.processBufferQueue(10);
     world.renderWorld();
 
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
 
+  // signal to the independant threads to close
   world.closeWorld();
 
+  // wait for the threas to close
   loadThread.join();
-  queueThread.join();
+  terrainGenerationThread.join();
+  meshGenerationThread.join();
 
   // cleanup
   glfwTerminate();
