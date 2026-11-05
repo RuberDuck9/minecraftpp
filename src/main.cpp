@@ -129,8 +129,8 @@ int main(void) {
 
     // buffer and render the world in the main thread (important!)
     world.processBufferQueue(10);
-    world.renderWorld();
     world.processUnloadQueue();
+    world.renderWorld();
 
     glfwSwapBuffers(window);
     glfwPollEvents();

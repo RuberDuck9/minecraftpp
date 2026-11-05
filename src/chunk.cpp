@@ -68,7 +68,7 @@ void Chunk::generateChunkMesh(void) {
 // send the chunk mesh to the gpu
 void Chunk::bufferChunkData(void) {
 
-  if (!chunkInitialized) {
+ if (!chunkInitialized) {
     // generate the vertex array object
     glGenVertexArrays(1, &VAO);
 
@@ -162,7 +162,6 @@ void Chunk::unloadChunk(void) {
   glDeleteBuffers(1, &VAO);
 
   chunkInitialized = false;
-  terrainGenerated = false;
   meshReady = false;
 
   chunkLoaded = false;

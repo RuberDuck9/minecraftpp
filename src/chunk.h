@@ -86,6 +86,12 @@ public:
     EBO = 0;
   }
 
+  bool operator==(const Chunk& OTHER_CHUNK) {
+    return (this->chunkPos.x == OTHER_CHUNK.chunkPos.x) &&
+           (this->chunkPos.y == OTHER_CHUNK.chunkPos.y) &&
+           (this->chunkPos.z == OTHER_CHUNK.chunkPos.z);
+  }
+
   // assign a block ID to each position within the chunk
   void generateChunkState(void);
 

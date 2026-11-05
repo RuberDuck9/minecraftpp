@@ -6,8 +6,8 @@
 #include <cmath>
 #include <functional>
 #include <unordered_map>
-#include <queue>
-#include <vector>
+#include <deque>
+#include <algorithm>
 
 #include "chunk.h"
 #include "camera.h"
@@ -73,19 +73,17 @@ public:
 
                 // find where the new chunk was added to the map, and pass a pointer to that location to the load queue
                 std::unordered_map<ChunkPos, Chunk>::iterator freshChunk = Chunks.find(targetChunkPos);
-                terrainGenerationQueue.push(&freshChunk->second);
+                terrainGenerationQueue.push_back(&freshChunk->second);
 
-              // if the target chunk does exist, then update the neighbors array for the chunks around it and regenerate its mesh
               } else if (targetChunk->second.chunkIsLoaded() ) {
-                updateNeighbors(targetChunk->second);
-
-                // this is a major bandaid solution, but basically just check to make sure that all the queues are empty so that a chunk isn't accidentally put into the queue twice
-                if (terrainGenerationQueue.empty() && meshGenerationQueue.empty() && bufferQueue.empty()) {
-                  meshGenerationQueue.push(&targetChunk->second);
+                if (!chunkInPipeline(&targetChunk->second)) {
+                  updateNeighbors(targetChunk->second);
+                  meshGenerationQueue.push_back(&targetChunk->second);
                 }
-              } else {
-                if (terrainGenerationQueue.empty() && meshGenerationQueue.empty() && bufferQueue.empty()) {
-                  terrainGenerationQueue.push(&targetChunk->second);
+
+              } else if (!targetChunk->second.chunkIsLoaded() ) {
+                if (!chunkInPipeline(&targetChunk->second)) {
+                  meshGenerationQueue.push_back(&targetChunk->second);
                 }
               }
             }
@@ -96,13 +94,14 @@ public:
 
     return;
   }
+
   // THREAD 2 - take an element from the terrain generation queue, generate it, and then send it to the mesh generation queue
   void processTerrainGenerationQueue(void) {
     while(shouldGenerateWorld) {
       if (!terrainGenerationQueue.empty()) {
         terrainGenerationQueue.front()->generateChunkState();
-        meshGenerationQueue.push(terrainGenerationQueue.front());
-        terrainGenerationQueue.pop();
+        meshGenerationQueue.push_back(terrainGenerationQueue.front());
+        terrainGenerationQueue.pop_front();
       }
     }
 
@@ -117,8 +116,8 @@ public:
         // this step should be superfluous but for the sake of consistency with other pipeline steps i included it (plus the overhead is minimal)
         if (meshGenerationQueue.front()->terrainIsGenerated()) {
           meshGenerationQueue.front()->generateChunkMesh();
-          bufferQueue.push(meshGenerationQueue.front());
-          meshGenerationQueue.pop();
+          bufferQueue.push_back(meshGenerationQueue.front());
+          meshGenerationQueue.pop_front();
         }
       }
     }
@@ -140,23 +139,21 @@ public:
       // iterate through every loaded chunk
       for (std::unordered_map<ChunkPos, Chunk>::iterator targetChunk = Chunks.begin(); targetChunk != Chunks.end(); targetChunk++) { 
 
-        // check if the position being checked is outside of render distance 
-        float dx = camX - targetChunk->first.x * 16, dy = camY - targetChunk->first.y * 16, dz = camZ - targetChunk->first.z * 16;
-        float distance = dx * dx + dy * dy + dz * dz;
-        distance = std::sqrt(distance);
-        distance /= 2;
+        // verify that the chunk being checked is still loaded (don't add stuff to the queue twice)
+        if (targetChunk->second.chunkIsLoaded()){
 
-        if (distance > radius) {
-          bool chunkAlreadyQueued = false;
-          for (unsigned int i = 0; i < unloadQueue.size(); i++) {
-            if (targetChunk->second.getChunkPos() == unloadQueue.at(i)->getChunkPos()) {
-              chunkAlreadyQueued = true;
+          // calculate the distance of the chunk away from the player
+          float dx = camX - targetChunk->first.x * 16, dy = camY - targetChunk->first.y * 16, dz = camZ - targetChunk->first.z * 16;
+          float distance = dx * dx + dy * dy + dz * dz;
+          distance = std::sqrt(distance);
+          distance /= 2;
+
+          // check if the chunk is outside of render distance, if so unload it
+          if (distance > radius) {
+
+            if (!chunkInPipeline(&targetChunk->second)) {
+              unloadQueue.push_back(&targetChunk->second);
             }
-          }
-
-          // if the chunk is outside of render distance, send it to the unload queue
-          if (!chunkAlreadyQueued) {
-            unloadQueue.push_back(&targetChunk->second);
           }
         }
       }
@@ -173,7 +170,7 @@ public:
         // ensure that a mesh has been generated for the chunk before sending it to the gpu
         if (bufferQueue.front()->meshIsReady()) {
           bufferQueue.front()->bufferChunkData();
-          bufferQueue.pop();
+          bufferQueue.pop_front();
         }
       }
     }
@@ -185,7 +182,7 @@ public:
   void processUnloadQueue(void) {
     while (!unloadQueue.empty()) {
         unloadQueue.front()->unloadChunk();
-        unloadQueue.erase(unloadQueue.begin());
+        unloadQueue.pop_front();
     }
 
     return;
@@ -205,6 +202,23 @@ public:
     }
 
     return;
+  }
+
+  bool chunkInPipeline(const Chunk* CHUNK) {
+
+    std::deque<Chunk*>::const_iterator targetChunkTerrainQueuePosition = std::find(terrainGenerationQueue.begin(), terrainGenerationQueue.end(), CHUNK);
+    bool inTerrainGenerationQueue = !(targetChunkTerrainQueuePosition == terrainGenerationQueue.end());
+
+    std::deque<Chunk*>::const_iterator targetChunkMeshQueuePosition = std::find(meshGenerationQueue.begin(), meshGenerationQueue.end(), CHUNK);
+    bool inMeshGenerationQueue = !(targetChunkMeshQueuePosition == meshGenerationQueue.end());
+
+    std::deque<Chunk*>::const_iterator targetChunkBufferQueuePosition = std::find(bufferQueue.begin(), bufferQueue.end(), CHUNK);
+    bool inBufferQueue = !(targetChunkBufferQueuePosition == bufferQueue.end());
+
+    std::deque<Chunk*>::const_iterator targetChunkUnloadQueuePosition = std::find(unloadQueue.begin(), unloadQueue.end(), CHUNK);
+    bool inUnloadQueue = !(targetChunkUnloadQueuePosition == unloadQueue.end());
+
+    return inTerrainGenerationQueue || inMeshGenerationQueue || inBufferQueue || inUnloadQueue;
   }
 
   // return a neighboring chunk in a specified direction if it exists
@@ -275,8 +289,8 @@ private:
   std::atomic<bool> shouldGenerateWorld = true;
 
   std::unordered_map<ChunkPos, Chunk> Chunks; 
-  std::queue<Chunk*> terrainGenerationQueue;
-  std::queue<Chunk*> meshGenerationQueue;
-  std::queue<Chunk*> bufferQueue;
-  std::vector<Chunk*> unloadQueue;
+  std::deque<Chunk*> terrainGenerationQueue;
+  std::deque<Chunk*> meshGenerationQueue;
+  std::deque<Chunk*> bufferQueue;
+  std::deque<Chunk*> unloadQueue;
 };
