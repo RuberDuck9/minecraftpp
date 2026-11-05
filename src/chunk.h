@@ -67,6 +67,7 @@ public:
     chunkInitialized = false;
     terrainGenerated = false;
     meshReady = false;
+    chunkLoaded = false;
 
     // give the chunk terrain default values
     for (uint8_t x = 0; x < chunkSize; x++) {
@@ -100,6 +101,9 @@ public:
   // update the neighbors array
   void setNeighbor(Chunk* neighbor, Direction direction);
 
+  // clear the chunk from gpu memory and mark it to not be rendered
+  void unloadChunk(void);
+
   // function to return the position of the chunk
   ChunkPos getChunkPos(void) const;
 
@@ -108,6 +112,8 @@ public:
 
   // return if the chunk is initialized
   bool meshIsReady(void) const;
+
+  bool chunkIsLoaded(void) const;
 
 private:
   // store the chunk coordinate (in increments of 16 compared to world coordinates)
@@ -137,6 +143,9 @@ private:
 
   // store whether or not the chunk is ready to be loaded
   bool meshReady;
+
+  // store if the chunk is loaded
+  bool chunkLoaded;
 
   // array to store pointers to all the neighboring chunks
   Chunk* neighbors[6];

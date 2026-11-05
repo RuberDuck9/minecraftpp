@@ -108,6 +108,8 @@ void Chunk::bufferChunkData(void) {
   glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
 
+  chunkLoaded = true;
+
   // unbind the vertex objects
   glBindVertexArray(0);
 
@@ -147,6 +149,25 @@ bool Chunk::terrainIsGenerated(void) const {
 
 bool Chunk::meshIsReady(void) const {
   return this->meshReady;
+}
+
+bool Chunk::chunkIsLoaded(void) const {
+  return this->chunkLoaded;
+}
+
+void Chunk::unloadChunk(void) {
+
+  glDeleteBuffers(1, &VBO);
+  glDeleteBuffers(1, &EBO);
+  glDeleteBuffers(1, &VAO);
+
+  chunkInitialized = false;
+  terrainGenerated = false;
+  meshReady = false;
+
+  chunkLoaded = false;
+
+  return;
 }
 
 // function to return the texture atlas coordinates for each block face

@@ -3,9 +3,11 @@
 // TODO: update the neighbor update function to return false if no neighbors needed updating
 
 #include <atomic>
+#include <cmath>
 #include <functional>
 #include <unordered_map>
 #include <queue>
+#include <vector>
 
 #include "chunk.h"
 #include "camera.h"
@@ -49,7 +51,10 @@ public:
 
             // check if the position being checked is within the search radius
             float dx = camX - px, dy = camY - py, dz = camZ - pz;
-            if (dx * dx + dy * dy + dz * dz <= radius * radius * radius) {
+            float distance = dx * dx + dy * dy + dz * dz;
+            distance = sqrt(distance);
+
+            if (distance <= radius) {
 
               // calculate normalized chunk coordinates and use them to generate a target chunk
               chunkX = px / 16;
@@ -71,12 +76,16 @@ public:
                 terrainGenerationQueue.push(&freshChunk->second);
 
               // if the target chunk does exist, then update the neighbors array for the chunks around it and regenerate its mesh
-              } else {
+              } else if (targetChunk->second.chunkIsLoaded() ) {
                 updateNeighbors(targetChunk->second);
 
                 // this is a major bandaid solution, but basically just check to make sure that all the queues are empty so that a chunk isn't accidentally put into the queue twice
                 if (terrainGenerationQueue.empty() && meshGenerationQueue.empty() && bufferQueue.empty()) {
                   meshGenerationQueue.push(&targetChunk->second);
+                }
+              } else {
+                if (terrainGenerationQueue.empty() && meshGenerationQueue.empty() && bufferQueue.empty()) {
+                  terrainGenerationQueue.push(&targetChunk->second);
                 }
               }
             }
@@ -87,7 +96,6 @@ public:
 
     return;
   }
-
   // THREAD 2 - take an element from the terrain generation queue, generate it, and then send it to the mesh generation queue
   void processTerrainGenerationQueue(void) {
     while(shouldGenerateWorld) {
@@ -118,7 +126,46 @@ public:
     return;
   }
 
-  // THREAD 4 (main) - take an element from the buffer queue and buffer its data to the gpu
+  // THREAD 4 - send chunks outside of render distance to the unload queue
+  void unloadChunk() {
+    while (shouldGenerateWorld) {
+      // grab the current player/camera position
+      float camX = camera.cameraPos.x;
+      float camY = camera.cameraPos.y;
+      float camZ = camera.cameraPos.z;
+
+      // define a search radius around the current position
+      int radius = renderDistance * 16;
+
+      // iterate through every loaded chunk
+      for (std::unordered_map<ChunkPos, Chunk>::iterator targetChunk = Chunks.begin(); targetChunk != Chunks.end(); targetChunk++) { 
+
+        // check if the position being checked is outside of render distance 
+        float dx = camX - targetChunk->first.x * 16, dy = camY - targetChunk->first.y * 16, dz = camZ - targetChunk->first.z * 16;
+        float distance = dx * dx + dy * dy + dz * dz;
+        distance = std::sqrt(distance);
+        distance /= 2;
+
+        if (distance > radius) {
+          bool chunkAlreadyQueued = false;
+          for (unsigned int i = 0; i < unloadQueue.size(); i++) {
+            if (targetChunk->second.getChunkPos() == unloadQueue.at(i)->getChunkPos()) {
+              chunkAlreadyQueued = true;
+            }
+          }
+
+          // if the chunk is outside of render distance, send it to the unload queue
+          if (!chunkAlreadyQueued) {
+            unloadQueue.push_back(&targetChunk->second);
+          }
+        }
+      }
+    }
+
+    return;
+  }
+
+  // THREAD 5 (main) - take an element from the buffer queue and buffer its data to the gpu
   void processBufferQueue(unsigned int count) {
     for (unsigned i = 0; i < count; i++) {
       if (!bufferQueue.empty()) {
@@ -134,16 +181,27 @@ public:
     return;
   }
 
-  // THREAD 4 (main) - loop through the unordered map and render it all
+  // THREAD 5 (main) - unload all chunks outside of render distance
+  void processUnloadQueue(void) {
+    while (!unloadQueue.empty()) {
+        unloadQueue.front()->unloadChunk();
+        unloadQueue.erase(unloadQueue.begin());
+    }
+
+    return;
+  }
+
+  // THREAD 5 (main) - loop through the unordered map and render it all
   void renderWorld(void) {
     for (std::unordered_map<ChunkPos, Chunk>::const_iterator it = Chunks.begin(); it != Chunks.end(); it++) { 
-
+      if (it->second.chunkIsLoaded()) {
       // if the chunk mesh isn't ready, wait for a moment until the other thread finishes generating it
       // i'm actually not quite sure why this works since the chunk won't be buffered if it isn't already, but it works so i'm not touching it
       while (!it->second.meshIsReady()) {}
 
       // get the second element of the unordered map (so the chunk itself, not the hash)
       it->second.renderChunkMesh();
+      }
     }
 
     return;
@@ -220,4 +278,5 @@ private:
   std::queue<Chunk*> terrainGenerationQueue;
   std::queue<Chunk*> meshGenerationQueue;
   std::queue<Chunk*> bufferQueue;
+  std::vector<Chunk*> unloadQueue;
 };

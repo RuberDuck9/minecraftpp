@@ -107,6 +107,7 @@ int main(void) {
   std::thread loadThread(&World::queueChunkLoading, &world);
   std::thread terrainGenerationThread(&World::processTerrainGenerationQueue, &world);
   std::thread meshGenerationThread(&World::processMeshGenerationQueue, &world);
+  std::thread chunkUnloadThread(&World::unloadChunk, &world);
 
   while (!glfwWindowShouldClose(window)) {
     // poll for user input each frame
@@ -129,6 +130,7 @@ int main(void) {
     // buffer and render the world in the main thread (important!)
     world.processBufferQueue(10);
     world.renderWorld();
+    world.processUnloadQueue();
 
     glfwSwapBuffers(window);
     glfwPollEvents();
@@ -141,6 +143,7 @@ int main(void) {
   loadThread.join();
   terrainGenerationThread.join();
   meshGenerationThread.join();
+  chunkUnloadThread.join();
 
   // cleanup
   glfwTerminate();
