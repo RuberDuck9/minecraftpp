@@ -1,3 +1,5 @@
+// TODO: update all const variables to be upper camel case
+
 #include <glm/ext/matrix_clip_space.hpp>
 #include <iostream>
 #include <thread>
@@ -121,7 +123,7 @@ int main(void) {
     glm::mat4 view = camera.getViewMatrix();
     customShader.setMat4("view", view);
 
-    glm::mat4 projection = glm::perspective(glm::radians(camera.fov), (float)windowWidth / windowHeight, 0.1f, 1024.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(camera.fov), (float)windowWidth / windowHeight, 0.1f, 1000.0f);
     customShader.setMat4("projection", projection);
 
     // buffer and render the world in the main thread (important!)

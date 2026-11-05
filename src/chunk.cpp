@@ -4,6 +4,10 @@
 // assign a block ID to each position within the chunk
 void Chunk::generateChunkState(void) {
 
+  // make sure that the chunk isn't loaded since its data is about to be deleted
+  terrainGenerated = false;
+  meshReady = false;
+
   for (uint8_t x = 0; x < chunkSize; x++) {
     for (uint8_t y = 0; y < chunkSize; y++) {
        for (uint8_t z = 0; z < chunkSize; z++) {
@@ -22,12 +26,17 @@ void Chunk::generateChunkState(void) {
     }
   }
 
-  chunkGenerated = true;
+  // mark the chunk as generated so it can progress through the pipeline
+  terrainGenerated = true;
+
   return;
 }
 
 // generate the actual chunk mesh
 void Chunk::generateChunkMesh(void) {
+
+  // make sure that the chunk isn't loaded since its data is about to be deleted
+  meshReady = false;
 
   // remove any existing mesh data before generating new stuff
   vertices.clear();
@@ -49,6 +58,9 @@ void Chunk::generateChunkMesh(void) {
       }
     }
   }
+
+  // mark the chunk as ready to be loaded
+  meshReady = true;
 
   return;
 }
@@ -99,8 +111,6 @@ void Chunk::bufferChunkData(void) {
   // unbind the vertex objects
   glBindVertexArray(0);
 
-  chunkLoaded = true;
-
   return;
 }
 
@@ -119,6 +129,24 @@ void Chunk::renderChunkMesh(void) const {
   glBindVertexArray(0);
 
   return;
+}
+
+void Chunk::setNeighbor(Chunk* chunk, Direction direction) {
+
+  neighbors[direction] = chunk;
+  return;
+}
+
+ChunkPos Chunk::getChunkPos(void) const {
+  return this->chunkPos;
+}
+
+bool Chunk::terrainIsGenerated(void) const {
+    return this->terrainGenerated;
+}
+
+bool Chunk::meshIsReady(void) const {
+  return this->meshReady;
 }
 
 // function to return the texture atlas coordinates for each block face
@@ -170,26 +198,4 @@ void Chunk::generateFace(const FacePos &facePos, const uint8_t &face, const bloc
   indices.push_back(index + 0);
 
   return;
-}
-
-ChunkPos Chunk::getChunkPos(void) const {
-  return this->chunkPos;
-}
-
-bool Chunk::chunkIsGenerated(void) const {
-  return this->chunkGenerated;
-}
-
-bool Chunk::chunkIsInitialized(void) const {
-  return this->chunkInitialized;
-}
-
-void Chunk::setNeighbor(Chunk* chunk, Direction direction) {
-  
-  neighbors[direction] = chunk;
-  return;
-}
-
-bool Chunk::chunkIsLoaded(void) const {
-  return this->chunkLoaded;
 }

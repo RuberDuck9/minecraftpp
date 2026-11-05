@@ -1,5 +1,4 @@
-// TODO: Rewrite chunk store logic to only use block ID's instead of the entire
-// blockType struct
+// TODO: Rewrite chunk store logic to only use block ID's instead of the entire blockType struct
 // TODO: implement the big three for the chunk class
 
 #include <cstdint>
@@ -59,11 +58,17 @@ class Chunk {
 public:
   // constructor
   Chunk(const ChunkPos chunkPos, const Shader &customShader) : chunkPos(chunkPos), customShader(customShader) {
+
+    // definte the model matrix
     model = glm::translate(glm::mat4(1.0f), glm::vec3(chunkPos.x * chunkSize, chunkPos.y * chunkSize, chunkPos.z * chunkSize));
     model = glm::scale(model, glm::vec3(255.0f, 255.0f, 255.0f));
+
+    // initialize the state variables
     chunkInitialized = false;
-    chunkGenerated = false;
-    chunkLoaded = false;
+    terrainGenerated = false;
+    meshReady = false;
+
+    // give the chunk terrain default values
     for (uint8_t x = 0; x < chunkSize; x++) {
       for (uint8_t y = 0; y < chunkSize; y++) {
          for (uint8_t z = 0; z < chunkSize; z++) {
@@ -73,10 +78,11 @@ public:
         }
       }
     }
+
+    // initialize the gpu object IDs to 0
     VAO = 0;
     VBO = 0;
     EBO = 0;
-    glBindVertexArray(0);
   }
 
   // assign a block ID to each position within the chunk
@@ -91,24 +97,20 @@ public:
   // render the loaded chunk gpu data
   void renderChunkMesh(void) const;
 
-  // return if the chunk is initialized
-  bool chunkIsInitialized() const;
-
-  // return if the chunk is generated
-  bool chunkIsGenerated() const;
-  
-  // return if the chunk is buffered to the gpu
-  bool chunkIsLoaded() const;
+  // update the neighbors array
+  void setNeighbor(Chunk* neighbor, Direction direction);
 
   // function to return the position of the chunk
   ChunkPos getChunkPos(void) const;
 
-  // update the neighbors array
-  void setNeighbor(Chunk* neighbor, Direction direction);
+  // return if the chunk's terrain has been generated
+  bool terrainIsGenerated(void) const;
+
+  // return if the chunk is initialized
+  bool meshIsReady(void) const;
 
 private:
-  // store the chunk coordinate (in increments of 16 compared to world
-  // coordinates)
+  // store the chunk coordinate (in increments of 16 compared to world coordinates)
   const ChunkPos chunkPos;
 
   // array to store the unique block at each position within the chunk
@@ -127,8 +129,14 @@ private:
   // vertex objects to store the chunk data on the gpu
   GLuint VAO, VBO, EBO;
 
-  // variables to store whether or not the chunk is loaded and generated
-  bool chunkInitialized, chunkGenerated, chunkLoaded;
+  // store if the chunk's gl objects have been set up yet
+  bool chunkInitialized;
+
+  // store if the chunk's terrain has been generated yet
+  bool terrainGenerated;
+
+  // store whether or not the chunk is ready to be loaded
+  bool meshReady;
 
   // array to store pointers to all the neighboring chunks
   Chunk* neighbors[6];
@@ -136,7 +144,6 @@ private:
   // function to return the texture atlas coordinates for each block face
   UV getUV(const uint8_t &face, const blockType &block) const;
 
-  // generate an individual chunk face and add it's data to the vertex and index
-  // vectors
+  // generate an individual chunk face and add it's data to the vertex and index vectors
   void generateFace(const FacePos &facePos, const uint8_t &face, const blockType &block);
 };

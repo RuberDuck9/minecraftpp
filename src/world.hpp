@@ -1,4 +1,6 @@
 // TODO: implement neighbor checks and only render exposed blocks
+// TODO: implement chunk unloading
+// TODO: update the neighbor update function to return false if no neighbors needed updating
 
 #include <atomic>
 #include <functional>
@@ -24,7 +26,7 @@ class World {
 public:
   World(const Shader &customShader, const Camera &camera) : customShader(customShader), camera(camera) {}
 
-  // queue all chunks within render distance of the player to be loaded if they are not already
+  // THREAD 1 - queue all chunks within render distance of the player to be loaded if they are not already
   void queueChunkLoading(void) {
 
     // loop forever as long as the world needs to be generated
@@ -72,7 +74,8 @@ public:
               } else {
                 updateNeighbors(targetChunk->second);
 
-                if (meshGenerationQueue.empty()) {
+                // this is a major bandaid solution, but basically just check to make sure that all the queues are empty so that a chunk isn't accidentally put into the queue twice
+                if (terrainGenerationQueue.empty() && meshGenerationQueue.empty() && bufferQueue.empty()) {
                   meshGenerationQueue.push(&targetChunk->second);
                 }
               }
@@ -85,7 +88,7 @@ public:
     return;
   }
 
-  // take an element from the terrain generation queue, generate it, and then send it to the mesh generation queue
+  // THREAD 2 - take an element from the terrain generation queue, generate it, and then send it to the mesh generation queue
   void processTerrainGenerationQueue(void) {
     while(shouldGenerateWorld) {
       if (!terrainGenerationQueue.empty()) {
@@ -98,39 +101,49 @@ public:
     return;
   }
 
-  // take an element from the mesh generation queue, generate it, and then send it to the gpu buffer queue
+  // THREAD 3 - take an element from the mesh generation queue, generate it, and then send it to the gpu buffer queue
   void processMeshGenerationQueue(void) {
     while(shouldGenerateWorld) {
       if (!meshGenerationQueue.empty()) {
-        meshGenerationQueue.front()->generateChunkMesh();
-        bufferQueue.push(meshGenerationQueue.front());
-        meshGenerationQueue.pop();
+        // make sure that the chunk's terrain has been generated before attempting to generate a mesh
+        // this step should be superfluous but for the sake of consistency with other pipeline steps i included it (plus the overhead is minimal)
+        if (meshGenerationQueue.front()->terrainIsGenerated()) {
+          meshGenerationQueue.front()->generateChunkMesh();
+          bufferQueue.push(meshGenerationQueue.front());
+          meshGenerationQueue.pop();
+        }
       }
     }
 
     return;
   }
 
-  // take an element from the buffer queue, and buffer its data to the gpu
+  // THREAD 4 (main) - take an element from the buffer queue and buffer its data to the gpu
   void processBufferQueue(unsigned int count) {
     for (unsigned i = 0; i < count; i++) {
       if (!bufferQueue.empty()) {
-        bufferQueue.front()->bufferChunkData();
-        bufferQueue.pop();
+
+        // ensure that a mesh has been generated for the chunk before sending it to the gpu
+        if (bufferQueue.front()->meshIsReady()) {
+          bufferQueue.front()->bufferChunkData();
+          bufferQueue.pop();
+        }
       }
     }
 
     return;
   }
 
-  // loop through the unordered map and render it all
+  // THREAD 4 (main) - loop through the unordered map and render it all
   void renderWorld(void) {
     for (std::unordered_map<ChunkPos, Chunk>::const_iterator it = Chunks.begin(); it != Chunks.end(); it++) { 
-      // make sure the chunk is initialized before trying to load it (this is important if it hasn't been processed through the queue yet)
-      if (it->second.chunkIsLoaded()) {
-        // get the second element of the unordered map (so the chunk itself, not the hash)
-        it->second.renderChunkMesh();
-      }
+
+      // if the chunk mesh isn't ready, wait for a moment until the other thread finishes generating it
+      // i'm actually not quite sure why this works since the chunk won't be buffered if it isn't already, but it works so i'm not touching it
+      while (!it->second.meshIsReady()) {}
+
+      // get the second element of the unordered map (so the chunk itself, not the hash)
+      it->second.renderChunkMesh();
     }
 
     return;
