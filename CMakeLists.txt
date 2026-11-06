@@ -26,7 +26,6 @@ add_executable(minecraftpp
 target_compile_options(minecraftpp PRIVATE
 	-Wall
 	-Wextra
-	-Werror
 	-O1
 	-g
 )

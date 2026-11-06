@@ -128,7 +128,7 @@ int main(void) {
     customShader.setMat4("projection", projection);
 
     // buffer and render the world in the main thread (important!)
-    world.processBufferQueue(10);
+    world.processBufferQueue();
     world.processUnloadQueue();
     world.renderWorld();
 

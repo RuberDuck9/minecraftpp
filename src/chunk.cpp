@@ -68,34 +68,36 @@ void Chunk::generateChunkMesh(void) {
 // send the chunk mesh to the gpu
 void Chunk::bufferChunkData(void) {
 
- if (!chunkInitialized) {
-    // generate the vertex array object
-    glGenVertexArrays(1, &VAO);
+  // NOTE *********************
+  // Ideally, the next 25 lines of code would only run on the first buffer of a chunk and would be cached afterwards,
+  // however, for some reason when I do that it doesn't work (well it sorta does but the results are interesting to
+  // say the least) SO, for now I just have it run every time since it makes stuff work and the performance overhead
+  // is relatively minimal (hopefully)
 
-    // bind the vertex array object 
-    glBindVertexArray(VAO);
+  // generate the vertex array object
+  glGenVertexArrays(1, &VAO);
 
-    // generate the gpu objects for storing the chunk's data
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
+  // bind the vertex array object 
+  glBindVertexArray(VAO);
 
-    // bind each buffer objects so config calls target them
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+  // generate the gpu objects for storing the chunk's data
+  glGenBuffers(1, &VBO);
+  glGenBuffers(1, &EBO);
 
-    // tell opengl how to interpret the buffered vertex data
-    glVertexAttribPointer(0, 3, GL_UNSIGNED_BYTE, GL_TRUE, 5 * sizeof(uint8_t), (void *)0);
-    glEnableVertexAttribArray(0);
+  // bind each buffer objects so config calls target them
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 
-    // tell opengl how to interpret the texture data
-    glVertexAttribPointer(1, 2, GL_UNSIGNED_BYTE, GL_FALSE, 5 * sizeof(uint8_t), (void *)(3 * sizeof(uint8_t)));
-    glEnableVertexAttribArray(1);
+  // tell opengl how to interpret the buffered vertex data
+  glVertexAttribPointer(0, 3, GL_UNSIGNED_BYTE, GL_TRUE, 5 * sizeof(uint8_t), (void *)0);
+  glEnableVertexAttribArray(0);
 
-    // unbind the vertex array object
-    glBindVertexArray(0);
+  // tell opengl how to interpret the texture data
+  glVertexAttribPointer(1, 2, GL_UNSIGNED_BYTE, GL_FALSE, 5 * sizeof(uint8_t), (void *)(3 * sizeof(uint8_t)));
+  glEnableVertexAttribArray(1);
 
-    chunkInitialized = true;
-  }
+  // unbind the vertex array object
+  glBindVertexArray(0);
 
   // bind the vertex array object 
   glBindVertexArray(VAO);

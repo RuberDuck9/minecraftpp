@@ -1,10 +1,12 @@
-// TODO: implement neighbor checks and only render exposed blocks
-// TODO: implement chunk unloading
+// TODO: implement neighbor checks and only render exposed blocks *******
+//
 // TODO: update the neighbor update function to return false if no neighbors needed updating
 
+#include <GLFW/glfw3.h>
 #include <atomic>
 #include <cmath>
 #include <functional>
+#include <mutex>
 #include <unordered_map>
 #include <deque>
 #include <algorithm>
@@ -73,17 +75,24 @@ public:
 
                 // find where the new chunk was added to the map, and pass a pointer to that location to the load queue
                 std::unordered_map<ChunkPos, Chunk>::iterator freshChunk = Chunks.find(targetChunkPos);
-                terrainGenerationQueue.push_back(&freshChunk->second);
 
+                terrainGenerationQueueMutex.lock();
+                terrainGenerationQueue.push_back(&freshChunk->second);
+                terrainGenerationQueueMutex.unlock();
+
+              // if the chunk does exist, check if it it's loaded; if it is loaded then update its neighbors array and regenerate its mesh, otherwise just load it
               } else if (targetChunk->second.chunkIsLoaded() ) {
                 if (!chunkInPipeline(&targetChunk->second)) {
                   updateNeighbors(targetChunk->second);
+                  meshGenerationQueueMutex.lock();
                   meshGenerationQueue.push_back(&targetChunk->second);
+                  meshGenerationQueueMutex.unlock();
                 }
-
               } else if (!targetChunk->second.chunkIsLoaded() ) {
                 if (!chunkInPipeline(&targetChunk->second)) {
+                  meshGenerationQueueMutex.lock();
                   meshGenerationQueue.push_back(&targetChunk->second);
+                  meshGenerationQueueMutex.unlock();
                 }
               }
             }
@@ -100,8 +109,14 @@ public:
     while(shouldGenerateWorld) {
       if (!terrainGenerationQueue.empty()) {
         terrainGenerationQueue.front()->generateChunkState();
+
+        meshGenerationQueueMutex.lock();
         meshGenerationQueue.push_back(terrainGenerationQueue.front());
+        meshGenerationQueueMutex.unlock();
+
+        terrainGenerationQueueMutex.lock();
         terrainGenerationQueue.pop_front();
+        terrainGenerationQueueMutex.unlock();
       }
     }
 
@@ -116,8 +131,14 @@ public:
         // this step should be superfluous but for the sake of consistency with other pipeline steps i included it (plus the overhead is minimal)
         if (meshGenerationQueue.front()->terrainIsGenerated()) {
           meshGenerationQueue.front()->generateChunkMesh();
+
+          bufferQueueMutex.lock();
           bufferQueue.push_back(meshGenerationQueue.front());
+          bufferQueueMutex.unlock();
+
+          meshGenerationQueueMutex.lock();
           meshGenerationQueue.pop_front();
+          meshGenerationQueueMutex.unlock();
         }
       }
     }
@@ -146,13 +167,16 @@ public:
           float dx = camX - targetChunk->first.x * 16, dy = camY - targetChunk->first.y * 16, dz = camZ - targetChunk->first.z * 16;
           float distance = dx * dx + dy * dy + dz * dz;
           distance = std::sqrt(distance);
-          distance /= 2;
+          distance -= 50;
 
           // check if the chunk is outside of render distance, if so unload it
           if (distance > radius) {
 
+            // make sure the chunk isn't already somewhere in the pipeline before trying to unload it
             if (!chunkInPipeline(&targetChunk->second)) {
+              unloadQueueMutex.lock();
               unloadQueue.push_back(&targetChunk->second);
+              unloadQueueMutex.unlock();
             }
           }
         }
@@ -162,33 +186,52 @@ public:
     return;
   }
 
-  // THREAD 5 (main) - take an element from the buffer queue and buffer its data to the gpu
-  void processBufferQueue(unsigned int count) {
-    for (unsigned i = 0; i < count; i++) {
-      if (!bufferQueue.empty()) {
+  // THREAD 0 (main) - take an element from the buffer queue and buffer its data to the gpu
+  void processBufferQueue(void) {
+    double startTime = glfwGetTime();
+    double currentTime;
 
+    // buffer chunks until 5 milliseconds passes (i don't check if the queue is empty because sometimes it is empty for a only a split
+    // second and that causes a whole buffering job to be effectively canceled
+    while (true) {
+
+      if (!bufferQueue.empty()) {
         // ensure that a mesh has been generated for the chunk before sending it to the gpu
         if (bufferQueue.front()->meshIsReady()) {
           bufferQueue.front()->bufferChunkData();
+
+          bufferQueueMutex.lock();
           bufferQueue.pop_front();
+          bufferQueueMutex.unlock();
         }
+
       }
+
+      // check how much time has passed and break if it has been over 5 milliseconds
+      currentTime = glfwGetTime();
+      if (currentTime - startTime > 0.005) {
+        break;
+      }
+
     }
 
     return;
   }
 
-  // THREAD 5 (main) - unload all chunks outside of render distance
+  // THREAD 0 (main) - unload all chunks outside of render distance
   void processUnloadQueue(void) {
     while (!unloadQueue.empty()) {
         unloadQueue.front()->unloadChunk();
+
+        unloadQueueMutex.lock();
         unloadQueue.pop_front();
+        unloadQueueMutex.unlock();
     }
 
     return;
   }
 
-  // THREAD 5 (main) - loop through the unordered map and render it all
+  // THREAD 0 (main) - loop through the unordered map and render it all
   void renderWorld(void) {
     for (std::unordered_map<ChunkPos, Chunk>::const_iterator it = Chunks.begin(); it != Chunks.end(); it++) { 
       if (it->second.chunkIsLoaded()) {
@@ -204,21 +247,43 @@ public:
     return;
   }
 
+  // return true if the target chunk is already in the rendering pipeline
   bool chunkInPipeline(const Chunk* CHUNK) {
 
+    terrainGenerationQueueMutex.lock();
     std::deque<Chunk*>::const_iterator targetChunkTerrainQueuePosition = std::find(terrainGenerationQueue.begin(), terrainGenerationQueue.end(), CHUNK);
     bool inTerrainGenerationQueue = !(targetChunkTerrainQueuePosition == terrainGenerationQueue.end());
+    terrainGenerationQueueMutex.unlock();
+    if (inTerrainGenerationQueue) {
+      return true;
+    }
 
+    meshGenerationQueueMutex.lock();
     std::deque<Chunk*>::const_iterator targetChunkMeshQueuePosition = std::find(meshGenerationQueue.begin(), meshGenerationQueue.end(), CHUNK);
     bool inMeshGenerationQueue = !(targetChunkMeshQueuePosition == meshGenerationQueue.end());
+    meshGenerationQueueMutex.unlock();
+    if (inMeshGenerationQueue) {
+      return true;
+    }
 
+    bufferQueueMutex.lock();
     std::deque<Chunk*>::const_iterator targetChunkBufferQueuePosition = std::find(bufferQueue.begin(), bufferQueue.end(), CHUNK);
     bool inBufferQueue = !(targetChunkBufferQueuePosition == bufferQueue.end());
+    bufferQueueMutex.unlock();
+    if (inBufferQueue) {
+      return true;
+    }
 
+    unloadQueueMutex.lock();
     std::deque<Chunk*>::const_iterator targetChunkUnloadQueuePosition = std::find(unloadQueue.begin(), unloadQueue.end(), CHUNK);
     bool inUnloadQueue = !(targetChunkUnloadQueuePosition == unloadQueue.end());
+    unloadQueueMutex.unlock();
+    if (inUnloadQueue) {
+      return true;
+    }
 
-    return inTerrainGenerationQueue || inMeshGenerationQueue || inBufferQueue || inUnloadQueue;
+    // if every search turned up false, it should be safe to assume the chunk isn't in the pipeline
+    return false;
   }
 
   // return a neighboring chunk in a specified direction if it exists
@@ -281,16 +346,32 @@ public:
   }
 
 private:
+
+  // store references to the camera and shader objects
   const Shader &customShader;
   const Camera &camera;
 
+  // define how wide of an area around the player should be rendered
   const int renderDistance = 4;
 
+  // atomic variable to control the stoppage of each independant thread
   std::atomic<bool> shouldGenerateWorld = true;
 
+  // unordered map to store the data for every generated chunk
   std::unordered_map<ChunkPos, Chunk> Chunks; 
+
+  // deque and mutex variables for each part of the pipeline
+  // the deque stores the objects moving through the pipeline
+  // the mutexes are used to make sure that no part of the pipeline is double accessed 
   std::deque<Chunk*> terrainGenerationQueue;
+  std::mutex terrainGenerationQueueMutex;
+
   std::deque<Chunk*> meshGenerationQueue;
+  std::mutex meshGenerationQueueMutex;
+
   std::deque<Chunk*> bufferQueue;
+  std::mutex bufferQueueMutex;
+
   std::deque<Chunk*> unloadQueue;
+  std::mutex unloadQueueMutex;
 };
