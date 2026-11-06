@@ -168,7 +168,9 @@ public:
           float dx = camX - targetChunk->first.x * 16, dy = camY - targetChunk->first.y * 16, dz = camZ - targetChunk->first.z * 16;
           float distance = dx * dx + dy * dy + dz * dz;
           distance = std::sqrt(distance);
-          distance -= 50;
+
+          // shrink the distance a little so there's a small buffer between loading and unloading (so border chunks don't flicker in and out)
+          distance -= 20;
 
           // check if the chunk is outside of render distance, if so unload it
           if (distance > radius) {
@@ -362,7 +364,7 @@ private:
   const Camera &camera;
 
   // define how wide of an area around the player should be rendered
-  const int renderDistance = 4;
+  const int renderDistance = 8;
 
   // atomic variable to control the stoppage of each independant thread
   std::atomic<bool> shouldGenerateWorld = true;

@@ -8,6 +8,10 @@ struct blockType {
   uint8_t tu, tv;
   uint8_t su, sv;
   uint8_t bu, bv;
+
+  bool operator==(const blockType& OTHERBLOCK) const {
+    return blockID == OTHERBLOCK.blockID;
+  }
 };
 
 const blockType air = { 

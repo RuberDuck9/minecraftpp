@@ -11,6 +11,13 @@
 // define chunk dimensions
 const inline uint8_t chunkSize = 16;
 
+// north = +z
+// south = -z
+// east = +x
+// west = -x
+// top/above = +y
+// bottom/below = -y
+
 enum Direction { 
   NORTH = 0, 
   SOUTH = 1, 
@@ -56,36 +63,11 @@ const inline FacePos faceCorners[6][4] = {
 class Chunk {
 
 public:
+
   // constructor
-  Chunk(const ChunkPos chunkPos, const Shader &customShader) : chunkPos(chunkPos), customShader(customShader) {
+  Chunk(const ChunkPos chunkPos, const Shader &customShader);
 
-    // definte the model matrix
-    model = glm::translate(glm::mat4(1.0f), glm::vec3(chunkPos.x * chunkSize, chunkPos.y * chunkSize, chunkPos.z * chunkSize));
-    model = glm::scale(model, glm::vec3(255.0f, 255.0f, 255.0f));
-
-    // initialize the state variables
-    chunkInitialized = false;
-    terrainGenerated = false;
-    meshReady = false;
-    chunkLoaded = false;
-
-    // give the chunk terrain default values
-    for (uint8_t x = 0; x < chunkSize; x++) {
-      for (uint8_t y = 0; y < chunkSize; y++) {
-         for (uint8_t z = 0; z < chunkSize; z++) {
-
-          chunkState[x][y][z] = air;
-
-        }
-      }
-    }
-
-    // initialize the gpu object IDs to 0
-    VAO = 0;
-    VBO = 0;
-    EBO = 0;
-  }
-
+  // comparison operator implementation (i'm only checking the position here because in theory two chunks should never occupy the same coordinates)
   bool operator==(const Chunk& OTHER_CHUNK) {
     return (this->chunkPos.x == OTHER_CHUNK.chunkPos.x) &&
            (this->chunkPos.y == OTHER_CHUNK.chunkPos.y) &&
@@ -104,11 +86,14 @@ public:
   // render the loaded chunk gpu data
   void renderChunkMesh(void) const;
 
+  // clear the chunk from gpu memory and mark it to not be rendered
+  void unloadChunk(void);
+
   // update the neighbors array
   void setNeighbor(Chunk* neighbor, Direction direction);
 
-  // clear the chunk from gpu memory and mark it to not be rendered
-  void unloadChunk(void);
+  // assign a pointer to a neighboring chunk in the neighbors array
+  const Chunk* getNeighbor(Direction direction) const;
 
   // function to return the position of the chunk
   ChunkPos getChunkPos(void) const;
@@ -119,9 +104,8 @@ public:
   // return if the chunk is initialized
   bool meshIsReady(void) const;
 
+  // return if the chunk is loaded (or should be anyway)
   bool chunkIsLoaded(void) const;
-
-  const Chunk* getNeighbor(Direction direction) const;
 
 private:
   // store the chunk coordinate (in increments of 16 compared to world coordinates)
@@ -157,6 +141,9 @@ private:
 
   // array to store pointers to all the neighboring chunks
   Chunk* neighbors[6];
+
+  // return true if a face neighbors air in a given direction
+  bool faceExposed(const FacePos &FACEPOS, Direction direction) const;
 
   // function to return the texture atlas coordinates for each block face
   UV getUV(const uint8_t &face, const blockType &block) const;

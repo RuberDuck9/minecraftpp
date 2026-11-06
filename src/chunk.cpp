@@ -1,6 +1,43 @@
 #include "chunk.h"
 #include "shader.h"
 
+// *************** PUBLIC STUFF ******************
+
+// constructor
+Chunk::Chunk(const ChunkPos chunkPos, const Shader &customShader) : chunkPos(chunkPos), customShader(customShader) {
+
+  // definte the model matrix
+  model = glm::translate(glm::mat4(1.0f), glm::vec3(chunkPos.x * chunkSize, chunkPos.y * chunkSize, chunkPos.z * chunkSize));
+  model = glm::scale(model, glm::vec3(255.0f, 255.0f, 255.0f));
+
+  // initialize the state variables
+  chunkInitialized = false;
+  terrainGenerated = false;
+  meshReady = false;
+  chunkLoaded = false;
+
+  // initialize the gpu object IDs to 0
+  VAO = 0;
+  VBO = 0;
+  EBO = 0;
+
+  // give the chunk terrain default values
+  for (uint8_t x = 0; x < chunkSize; x++) {
+    for (uint8_t y = 0; y < chunkSize; y++) {
+       for (uint8_t z = 0; z < chunkSize; z++) {
+
+        chunkState[x][y][z] = air;
+
+      }
+    }
+  }
+
+  // assign nullptr's to all of the neighbors by default
+  for (unsigned int i = NORTH; i <= BOTTOM; i++) {
+    neighbors[static_cast<Direction>(i)] = nullptr;
+  }
+}
+
 // assign a block ID to each position within the chunk
 void Chunk::generateChunkState(void) {
 
@@ -46,19 +83,17 @@ void Chunk::generateChunkMesh(void) {
     for (uint8_t y = 0; y < chunkSize; y++) {
        for (uint8_t z = 0; z < chunkSize; z++) {
 
-        if (chunkState[x][y][z].blockID != 0) {
-          generateFace({x, y, z}, NORTH, chunkState[x][y][z]);
-          generateFace({x, y, z}, SOUTH, chunkState[x][y][z]);
-          generateFace({x, y, z}, EAST, chunkState[x][y][z]);
-          generateFace({x, y, z}, WEST, chunkState[x][y][z]);
-          generateFace({x, y, z}, TOP, chunkState[x][y][z]);
-          generateFace({x, y, z}, BOTTOM, chunkState[x][y][z]);
+        if (chunkState[x][y][z].blockID != air.blockID) {
+          for (unsigned int i = NORTH; i <= BOTTOM; i++) {
+            if (faceExposed({x, y, z}, static_cast<Direction>(i))) {
+              generateFace({x, y, z}, static_cast<Direction>(i), chunkState[x][y][z]);
+            }
+          }
         }
 
       }
     }
   }
-
   // mark the chunk as ready to be loaded
   meshReady = true;
 
@@ -135,28 +170,6 @@ void Chunk::renderChunkMesh(void) const {
   return;
 }
 
-void Chunk::setNeighbor(Chunk* chunk, Direction direction) {
-
-  neighbors[direction] = chunk;
-  return;
-}
-
-ChunkPos Chunk::getChunkPos(void) const {
-  return this->chunkPos;
-}
-
-bool Chunk::terrainIsGenerated(void) const {
-    return this->terrainGenerated;
-}
-
-bool Chunk::meshIsReady(void) const {
-  return this->meshReady;
-}
-
-bool Chunk::chunkIsLoaded(void) const {
-  return this->chunkLoaded;
-}
-
 void Chunk::unloadChunk(void) {
 
   glDeleteBuffers(1, &VBO);
@@ -169,6 +182,113 @@ void Chunk::unloadChunk(void) {
   chunkLoaded = false;
 
   return;
+}
+
+// assign a pointer to a neighboring chunk in the neighbors array
+void Chunk::setNeighbor(Chunk* chunk, Direction direction) {
+  neighbors[direction] = chunk;
+  return;
+}
+
+// return a neighboring chunk in a specified direction if it exists
+const Chunk* Chunk::getNeighbor(Direction direction) const {
+  // generate a position for where to search based on the current chunk position and the search direction
+  switch (direction) {
+    case NORTH:
+      return neighbors[NORTH]; 
+      break;
+    case SOUTH:
+      return neighbors[SOUTH]; 
+      break;
+    case EAST:
+      return neighbors[EAST]; 
+      break;
+    case WEST:
+      return neighbors[WEST]; 
+      break;
+    case ABOVE:
+      return neighbors[ABOVE]; 
+      break;
+    case BELOW:
+      return neighbors[BELOW]; 
+      break;
+    // if an invald enum is passed, return a nullptr since this is indefined behavior (and should never happen)
+    default:
+      return nullptr;
+  }
+}
+
+// function to return the position of the chunk
+ChunkPos Chunk::getChunkPos(void) const {
+  return this->chunkPos;
+}
+
+// return if the chunk's terrain has been generated
+bool Chunk::terrainIsGenerated(void) const {
+    return this->terrainGenerated;
+}
+
+// return if the chunk is initialized
+bool Chunk::meshIsReady(void) const {
+  return this->meshReady;
+}
+
+// return if the chunk is loaded (or should be anyway)
+bool Chunk::chunkIsLoaded(void) const {
+  return this->chunkLoaded;
+}
+
+// *************** PRIVATE STUFF ******************
+
+// return true if a face neighbors air in a given direction
+bool Chunk::faceExposed(const FacePos &FACEPOS, Direction direction) const {
+
+  // separate out each direction to make the following code cleaner
+  uint8_t faceX = FACEPOS.x, faceY = FACEPOS.y, faceZ = FACEPOS.z;
+
+  // for each direction, check if it is on a chunk border, if so check the neighboring chunk's block in that direction for air
+  // if it is not on a chunk border, just check this chunk's internal state for if it is air or not
+  switch(direction){
+    case NORTH:
+      if (faceZ == chunkSize - 1) {
+        return true;
+      } else {
+        return chunkState[faceX][faceY][faceZ + 1] == air;
+      }
+    case SOUTH:
+      if (faceZ == 0) {
+        return true;
+      } else {
+        return chunkState[faceX][faceY][faceZ - 1] == air;
+      }
+  case EAST:
+      if (faceX == chunkSize - 1) {
+        return true;
+      } else {
+        return chunkState[faceX + 1][faceY][faceZ] == air;
+      }
+  case WEST:
+      if (faceX == 0) {
+        return true;
+      } else {
+        return chunkState[faceX - 1][faceY][faceZ] == air;
+      }
+  case TOP:
+      if (faceY == chunkSize - 1) {
+        return true;
+      } else {
+        return chunkState[faceX][faceY + 1][faceZ] == air;
+      }
+  case BOTTOM:
+      if (faceY == 0) {
+        return true;
+      } else {
+        return chunkState[faceX][faceY - 1][faceZ] == air;
+      }
+    // if some invalid enum is passed, render just to be safe
+    default:
+        return true;
+  }
 }
 
 // function to return the texture atlas coordinates for each block face
@@ -222,32 +342,4 @@ void Chunk::generateFace(const FacePos &facePos, const uint8_t &face, const bloc
   return;
 }
 
-
-// return a neighboring chunk in a specified direction if it exists
-const Chunk* Chunk::getNeighbor(Direction direction) const {
-  // generate a position for where to search based on the current chunk position and the search direction
-  switch (direction) {
-    case NORTH:
-      return neighbors[NORTH]; 
-      break;
-    case SOUTH:
-      return neighbors[SOUTH]; 
-      break;
-    case EAST:
-      return neighbors[EAST]; 
-      break;
-    case WEST:
-      return neighbors[WEST]; 
-      break;
-    case ABOVE:
-      return neighbors[ABOVE]; 
-      break;
-    case BELOW:
-      return neighbors[BELOW]; 
-      break;
-    // if an invald enum is passed, return a nullptr since this is indefined behavior (and should never happen)
-    default:
-      return nullptr;
-  }
-}
 
