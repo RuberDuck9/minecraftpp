@@ -221,3 +221,33 @@ void Chunk::generateFace(const FacePos &facePos, const uint8_t &face, const bloc
 
   return;
 }
+
+
+// return a neighboring chunk in a specified direction if it exists
+const Chunk* Chunk::getNeighbor(Direction direction) const {
+  // generate a position for where to search based on the current chunk position and the search direction
+  switch (direction) {
+    case NORTH:
+      return neighbors[NORTH]; 
+      break;
+    case SOUTH:
+      return neighbors[SOUTH]; 
+      break;
+    case EAST:
+      return neighbors[EAST]; 
+      break;
+    case WEST:
+      return neighbors[WEST]; 
+      break;
+    case ABOVE:
+      return neighbors[ABOVE]; 
+      break;
+    case BELOW:
+      return neighbors[BELOW]; 
+      break;
+    // if an invald enum is passed, return a nullptr since this is indefined behavior (and should never happen)
+    default:
+      return nullptr;
+  }
+}
+

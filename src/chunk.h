@@ -121,6 +121,8 @@ public:
 
   bool chunkIsLoaded(void) const;
 
+  const Chunk* getNeighbor(Direction direction) const;
+
 private:
   // store the chunk coordinate (in increments of 16 compared to world coordinates)
   const ChunkPos chunkPos;

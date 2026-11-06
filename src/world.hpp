@@ -1,5 +1,4 @@
 // TODO: implement neighbor checks and only render exposed blocks *******
-//
 // TODO: update the neighbor update function to return false if no neighbors needed updating
 
 #include <GLFW/glfw3.h>
@@ -82,11 +81,13 @@ public:
 
               // if the chunk does exist, check if it it's loaded; if it is loaded then update its neighbors array and regenerate its mesh, otherwise just load it
               } else if (targetChunk->second.chunkIsLoaded() ) {
-                if (!chunkInPipeline(&targetChunk->second)) {
-                  updateNeighbors(targetChunk->second);
-                  meshGenerationQueueMutex.lock();
-                  meshGenerationQueue.push_back(&targetChunk->second);
-                  meshGenerationQueueMutex.unlock();
+                // temporarily disabled because this nukes performance for some reason
+                if (false && !chunkInPipeline(&targetChunk->second)) {
+                  if( updateNeighbors(targetChunk->second) ) {
+                    meshGenerationQueueMutex.lock();
+                    meshGenerationQueue.push_back(&targetChunk->second);
+                    meshGenerationQueueMutex.unlock();
+                  }
                 }
               } else if (!targetChunk->second.chunkIsLoaded() ) {
                 if (!chunkInPipeline(&targetChunk->second)) {
@@ -287,7 +288,7 @@ public:
   }
 
   // return a neighboring chunk in a specified direction if it exists
-  Chunk* getNeighbor(const Chunk& chunk, Direction direction) {
+  Chunk* searchNeighbor(const Chunk& chunk, Direction direction) {
     ChunkPos currentChunkPos = chunk.getChunkPos();
     ChunkPos targetChunkPos;
 
@@ -330,19 +331,28 @@ public:
   }
 
   // update the neighrs array for a chunk with all of its neighboring chunks
-  void updateNeighbors(Chunk& chunk) {
-    chunk.setNeighbor( getNeighbor(chunk, NORTH), NORTH ); 
-    chunk.setNeighbor( getNeighbor(chunk, SOUTH), NORTH ); 
-    chunk.setNeighbor( getNeighbor(chunk,  EAST),  WEST ); 
-    chunk.setNeighbor( getNeighbor(chunk,  WEST),  EAST ); 
-    chunk.setNeighbor( getNeighbor(chunk, ABOVE), ABOVE ); 
-    chunk.setNeighbor( getNeighbor(chunk, BELOW), BELOW ); 
+  bool updateNeighbors(Chunk& chunk) {
 
-    return;
+    bool chunkNeighorsChanged = false;
+
+    // get the neighboring chunk, then check if it has already been set
+    // if it has, then don't bother updating, if it hasn't, update and make note of the fact that you updated
+    for (unsigned int i = NORTH; i <= BOTTOM; i++) {
+      Chunk* newNeighbor = searchNeighbor(chunk, static_cast<Direction>(i)); 
+      const Chunk* currentNeighbor = chunk.getNeighbor(static_cast<Direction>(i));
+      if (newNeighbor != currentNeighbor ) {
+        chunk.setNeighbor( newNeighbor, static_cast<Direction>(i) ); 
+        chunkNeighorsChanged = true;
+      }
+    }
+
+    return chunkNeighorsChanged;
   }
 
   void closeWorld(void) {
     shouldGenerateWorld = false;
+
+    return;
   }
 
 private:
