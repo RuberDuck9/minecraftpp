@@ -4,6 +4,7 @@
 #include <GLFW/glfw3.h>
 #include <atomic>
 #include <cmath>
+#include <cstddef>
 #include <functional>
 #include <mutex>
 #include <unordered_map>
@@ -64,25 +65,26 @@ public:
               ChunkPos targetChunkPos = {chunkX, chunkY, chunkZ};
 
               // check if the target chunk exists yet
-              std::unordered_map<ChunkPos, Chunk>::iterator targetChunk = Chunks.find(targetChunkPos);
+              std::unordered_map<ChunkPos, Chunk>::iterator targetChunk = loadedChunks.find(targetChunkPos);
 
               // runs if the target chunk does not yet exist
-              if (targetChunk == Chunks.end()){
+              if (targetChunk == loadedChunks.end()){
 
                 // generate the target chunk and add it to the Chunks unordered_map
-                Chunks.emplace(targetChunkPos, Chunk(targetChunkPos, customShader));
+                loadedChunksMutex.lock();
+                loadedChunks.emplace(targetChunkPos, Chunk(targetChunkPos, customShader));
+                loadedChunksMutex.unlock();
 
                 // find where the new chunk was added to the map, and pass a pointer to that location to the load queue
-                std::unordered_map<ChunkPos, Chunk>::iterator freshChunk = Chunks.find(targetChunkPos);
+                std::unordered_map<ChunkPos, Chunk>::iterator freshChunk = loadedChunks.find(targetChunkPos);
 
                 terrainGenerationQueueMutex.lock();
                 terrainGenerationQueue.push_back(&freshChunk->second);
                 terrainGenerationQueueMutex.unlock();
-
               // if the chunk does exist, check if it it's loaded; if it is loaded then update its neighbors array and regenerate its mesh, otherwise just load it
               } else if (targetChunk->second.chunkIsLoaded() ) {
                 // temporarily disabled because this nukes performance for some reason
-                if (false && !chunkInPipeline(&targetChunk->second)) {
+                if (!chunkInPipeline(&targetChunk->second)) {
                   if( updateNeighbors(targetChunk->second) ) {
                     meshGenerationQueueMutex.lock();
                     meshGenerationQueue.push_back(&targetChunk->second);
@@ -159,7 +161,8 @@ public:
       int radius = renderDistance * 16;
 
       // iterate through every loaded chunk
-      for (std::unordered_map<ChunkPos, Chunk>::iterator targetChunk = Chunks.begin(); targetChunk != Chunks.end(); targetChunk++) { 
+      loadedChunksMutex.lock();
+      for (std::unordered_map<ChunkPos, Chunk>::iterator targetChunk = loadedChunks.begin(); targetChunk != loadedChunks.end(); targetChunk++) { 
 
         // verify that the chunk being checked is still loaded (don't add stuff to the queue twice)
         if (targetChunk->second.chunkIsLoaded()){
@@ -184,6 +187,7 @@ public:
           }
         }
       }
+      loadedChunksMutex.unlock();
     }
 
     return;
@@ -226,6 +230,11 @@ public:
     while (!unloadQueue.empty()) {
         unloadQueue.front()->unloadChunk();
 
+        std::unordered_map<ChunkPos, Chunk>::iterator targetChunk = loadedChunks.find(unloadQueue.front()->getChunkPos());
+        loadedChunksMutex.lock();
+        loadedChunks.erase(targetChunk);
+        loadedChunksMutex.unlock();
+
         unloadQueueMutex.lock();
         unloadQueue.pop_front();
         unloadQueueMutex.unlock();
@@ -236,7 +245,7 @@ public:
 
   // THREAD 0 (main) - loop through the unordered map and render it all
   void renderWorld(void) {
-    for (std::unordered_map<ChunkPos, Chunk>::const_iterator it = Chunks.begin(); it != Chunks.end(); it++) { 
+    for (std::unordered_map<ChunkPos, Chunk>::const_iterator it = loadedChunks.begin(); it != loadedChunks.end(); it++) { 
       if (it->second.chunkIsLoaded()) {
       // if the chunk mesh isn't ready, wait for a moment until the other thread finishes generating it
       // i'm actually not quite sure why this works since the chunk won't be buffered if it isn't already, but it works so i'm not touching it
@@ -320,10 +329,10 @@ public:
     }
 
     // check if the target chunk exists within the chunk map
-    std::unordered_map<ChunkPos, Chunk>::iterator targetChunk = Chunks.find(targetChunkPos);
+    std::unordered_map<ChunkPos, Chunk>::iterator targetChunk = loadedChunks.find(targetChunkPos);
 
     // if it does, return a pointer to it
-    if (targetChunk != Chunks.end()){
+    if (targetChunk != loadedChunks.end()){
       return &targetChunk->second;
     // if it is not found, return a nullptr
     } else {
@@ -342,7 +351,7 @@ public:
     for (unsigned int i = NORTH; i <= BOTTOM; i++) {
       Chunk* newNeighbor = searchNeighbor(chunk, static_cast<Direction>(i)); 
       const Chunk* currentNeighbor = chunk.getNeighbor(static_cast<Direction>(i));
-      if (newNeighbor != currentNeighbor ) {
+      if (newNeighbor != currentNeighbor) {
         chunk.setNeighbor( newNeighbor, static_cast<Direction>(i) ); 
         chunkNeighorsChanged = true;
       }
@@ -370,11 +379,15 @@ private:
   std::atomic<bool> shouldGenerateWorld = true;
 
   // unordered map to store the data for every generated chunk
-  std::unordered_map<ChunkPos, Chunk> Chunks; 
+  std::unordered_map<ChunkPos, Chunk> loadedChunks; 
+  std::unordered_map<ChunkPos, Chunk> generatedChunks; 
 
   // deque and mutex variables for each part of the pipeline
   // the deque stores the objects moving through the pipeline
   // the mutexes are used to make sure that no part of the pipeline is double accessed 
+  std::mutex loadedChunksMutex;
+  std::mutex generatedChunksMutex;
+
   std::deque<Chunk*> terrainGenerationQueue;
   std::mutex terrainGenerationQueueMutex;
 

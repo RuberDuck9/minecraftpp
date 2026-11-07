@@ -251,37 +251,61 @@ bool Chunk::faceExposed(const FacePos &FACEPOS, Direction direction) const {
   switch(direction){
     case NORTH:
       if (faceZ == chunkSize - 1) {
-        return true;
+        if (neighbors[NORTH] != nullptr) {
+          return neighbors[NORTH]->chunkState[faceX][faceY][0] == air;
+        } else {
+          return true;
+        }
       } else {
         return chunkState[faceX][faceY][faceZ + 1] == air;
       }
     case SOUTH:
       if (faceZ == 0) {
-        return true;
+        if (neighbors[SOUTH] != nullptr) {
+          return neighbors[SOUTH]->chunkState[faceX][faceY][chunkSize - 1] == air;
+        } else {
+          return true;
+        }
       } else {
         return chunkState[faceX][faceY][faceZ - 1] == air;
       }
   case EAST:
       if (faceX == chunkSize - 1) {
-        return true;
+        if (neighbors[EAST] != nullptr) {
+          return neighbors[EAST]->chunkState[0][faceY][faceZ] == air;
+        } else {
+          return true;
+        }
       } else {
         return chunkState[faceX + 1][faceY][faceZ] == air;
       }
   case WEST:
       if (faceX == 0) {
-        return true;
+        if (neighbors[WEST] != nullptr) {
+          return neighbors[WEST]->chunkState[chunkSize - 1][faceY][faceZ] == air;
+        } else {
+          return true;
+        }
       } else {
         return chunkState[faceX - 1][faceY][faceZ] == air;
       }
   case TOP:
       if (faceY == chunkSize - 1) {
-        return true;
+        if (neighbors[TOP] != nullptr) {
+          return neighbors[TOP]->chunkState[faceX][0][faceY] == air;
+        } else {
+          return true;
+        }
       } else {
         return chunkState[faceX][faceY + 1][faceZ] == air;
       }
   case BOTTOM:
       if (faceY == 0) {
-        return true;
+        if (neighbors[BOTTOM] != nullptr) {
+          return neighbors[BOTTOM]->chunkState[faceX][chunkSize - 1][faceZ] == air;
+        } else {
+          return true;
+        }
       } else {
         return chunkState[faceX][faceY - 1][faceZ] == air;
       }
